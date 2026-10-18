@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v2.2 | Auto Steal (Anti-Die & Fix Safe Zone)
+--  AxD Hub v2.3 | Optimized, No Lag, Godmode Halloween, Zero Delay
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
 
 local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
@@ -19,7 +20,20 @@ if not parentGui then parentGui = PG end
 
 if parentGui:FindFirstChild("AxDHubV1") then parentGui.AxDHubV1:Destroy() end
 
---═════════════ TIER COLORS ═════════════
+-- ⚡ PERINGATAN GRAFIK SAAT EXECUTE
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "AxD Hub v2.3",
+        Text = "Mengoptimalkan grafik & mematikan efek berat agar tidak ngeleg...",
+        Duration = 5
+    })
+    -- Otomatis turunin kualitas grafis
+    Lighting.GlobalShadows = false
+    Lighting.FogEnd = 100
+    settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+end)
+
+--═════════════ TIER COLORS & DATA ═════════════
 local TierColors = {
     ["COMMON"] = Color3.fromRGB(100, 255, 100), ["UNCOMMON"] = Color3.fromRGB(100, 150, 255),
     ["RARE"] = Color3.fromRGB(200, 100, 255), ["EPIC"] = Color3.fromRGB(255, 255, 100),
@@ -28,7 +42,6 @@ local TierColors = {
     ["ETERNAL"] = Color3.fromRGB(255, 255, 255), ["DIVINE"] = Color3.fromRGB(255, 215, 0)
 }
 
---═════════════ DATA HEWAN ═════════════
 local PetData = {
     ["Chicken"] = "COMMON", ["Dog"] = "COMMON", ["Frog"] = "COMMON", ["Duckling"] = "COMMON", ["Jerboa"] = "COMMON", ["Scorpion"] = "COMMON", 
     ["Chameleon"] = "COMMON", ["Sloth"] = "COMMON", ["Penguin"] = "COMMON", ["Snow Rabbit"] = "COMMON", ["Lava Gecko"] = "COMMON", ["Ash Beetle"] = "COMMON", 
@@ -74,9 +87,8 @@ local PetData = {
 --═════════════ STATE ═════════════
 local SelectedEggs = {}
 local AutoSteal = false
-local AntiHit = false
-local AntiGuard = false
 local Running = true
+local SafeZonePart = nil
 
 --═════════════ HELPERS ═════════════
 local function new(cls, props, parent)
@@ -86,13 +98,8 @@ local function new(cls, props, parent)
     return o
 end
 
-local function corner(o, r)
-    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 4); c.Parent = o
-end
-
-local function stroke(o, color, thick)
-    local s = Instance.new("UIStroke"); s.Color = color or Color3.fromRGB(0, 0, 0); s.Thickness = thick or 2; s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; s.Parent = o
-end
+local function corner(o, r) local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, r or 4); c.Parent = o end
+local function stroke(o, color, thick) local s = Instance.new("UIStroke"); s.Color = color or Color3.fromRGB(0,0,0); s.Thickness = thick or 2; s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border; s.Parent = o end
 
 local function drag(frame, handle)
     local dragging, dragStart, startPos
@@ -117,83 +124,82 @@ local function getHRP()
     return c and c:FindFirstChild("HumanoidRootPart") or nil
 end
 
-local function teleportTo(cf)
-    local hrp = getHRP()
-    if hrp then
-        hrp.CFrame = cf
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
+-- Paksa Anti Hit (Godmode Instan)
+local function setupGodmode(char)
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.HealthChanged:Connect(function()
+            if AutoSteal or Running then
+                if hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
+            end
+        end)
+        local forceGod = RunService.Heartbeat:Connect(function()
+            if (AutoSteal or Running) and hum.Health < hum.MaxHealth then
+                hum.Health = hum.MaxHealth
+            end
+        end)
     end
 end
 
--- Safe Zone Logic yang lebih pintar
-local function findSafeZone()
-    -- 1. Cari SpawnLocation
-    for _, o in ipairs(Workspace:GetDescendants()) do
-        if o:IsA("SpawnLocation") then return o end
-    end
-    
-    -- 2. Cari Base sesuai nama Player atau nama umum
+LP.CharacterAdded:Connect(setupGodmode)
+if LP.Character then setupGodmode(LP.Character) end
+
+-- Cari Safe Zone (Hanya 1x agar tidak lag)
+local function getSafeZone()
+    if SafeZonePart and SafeZonePart.Parent then return SafeZonePart end
     for _, o in ipairs(Workspace:GetDescendants()) do
         local n = o.Name:lower()
         if n:find("safezone") or n:find("base") or n:find("spawn") or n:find(LP.Name:lower()) then
-            if o:IsA("BasePart") then return o end
+            if o:IsA("BasePart") then SafeZonePart = o; return o end
             if o:IsA("Model") then
                 local p = o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart", true)
-                if p then return p end
+                if p then SafeZonePart = p; return p end
             end
         end
     end
     return nil
 end
 
+-- Cari Egg di Wild (Anti Lag: pakai FindFirstChild rekursif, bukan GetDescendants)
 local function findWildEgg(name)
-    local safe = findSafeZone()
-    for _, o in ipairs(Workspace:GetDescendants()) do
-        if o:IsA("Model") and o.Name:lower():find(name:lower()) then
-            local p = o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart", true)
-            if p then
-                if safe then
-                    local dist = (p.Position - safe.Position).Magnitude
-                    if dist > 50 then return { model = o, part = p } end
-                else
-                    return { model = o, part = p }
-                end
+    local safe = getSafeZone()
+    -- Cari model yang namanya mengandung nama egg
+    local eggModel = Workspace:FindFirstChild(name, true)
+    if eggModel and eggModel:IsA("Model") then
+        local p = eggModel.PrimaryPart or eggModel:FindFirstChildWhichIsA("BasePart", true)
+        if p then
+            if safe and (p.Position - safe.Position).Magnitude < 80 then
+                return nil -- Skip jika di dalam base
             end
+            return { model = eggModel, part = p }
         end
     end
     return nil
 end
 
---═════════════ STEAL LOGIC ═════════════
+--═════════════ STEAL LOGIC (ZERO DELAY) ═════════════
 local function startStealLoop()
     task.spawn(function()
         while Running do
-            -- Cek apakah player hidup
-            local char = LP.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            
-            if AutoSteal and next(SelectedEggs) and hum and hum.Health > 0 then
-                local target = nil
-                for name, active in pairs(SelectedEggs) do
-                    if active then
-                        target = findWildEgg(name)
-                        if target then break end
+            if AutoSteal and next(SelectedEggs) then
+                local hrp = getHRP()
+                if hrp then
+                    local target = nil
+                    for name, active in pairs(SelectedEggs) do
+                        if active then
+                            target = findWildEgg(name)
+                            if target then break end
+                        end
                     end
-                end
-                
-                if target then
-                    local hrp = getHRP()
-                    if hrp then
-                        -- Teleport ke atas egg (dikasih +5 biar gak nyangkut)
-                        teleportTo(target.part.CFrame + Vector3.new(0, 5, 0))
-                        task.wait(0.15) -- Jeda napas bentar biar server nge-load
+                    
+                    if target then
+                        -- 1. Teleport ke Egg (Langsung tanpa delay)
+                        hrp.CFrame = target.part.CFrame + Vector3.new(0, 3, 0)
                         
-                        -- Ambil Prompt
+                        -- 2. Ambil (Prompt & Touch)
                         for _, d in ipairs(target.model:GetDescendants()) do
                             if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
                         end
-                        -- Touch Interest
                         for _, p in ipairs(target.model:GetDescendants()) do
                             if p:IsA("BasePart") then
                                 pcall(function() firetouchinterest(hrp, p, 0) end)
@@ -201,17 +207,17 @@ local function startStealLoop()
                             end
                         end
                         
-                        task.wait(0.15)
-                        -- Balik ke Safe Zone (+5 biar gak nyangkut/fall damage)
-                        local safe = findSafeZone()
-                        if safe then teleportTo(safe.CFrame + Vector3.new(0, 5, 0)) end
-                        task.wait(0.15)
+                        -- 3. LANGSUNG KABUR (0.05 detik biar server sempet deteksi grab)
+                        task.wait(0.05)
+                        local safe = getSafeZone()
+                        if safe then hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) end
+                        
+                    else
+                        task.wait(0.5) -- Egg ga ada, tunggu
                     end
-                else
-                    task.wait(0.5) -- Egg belum spawn, nunggu santai
                 end
             else
-                task.wait(0.5) -- Auto steal mati ATAU player mati, nunggu
+                task.wait(0.5)
             end
             task.wait(0.05)
         end
@@ -219,28 +225,20 @@ local function startStealLoop()
 end
 startStealLoop()
 
---═════════════ GUARD & ANTI-DIE LOGIC ═════════════
-RunService.Heartbeat:Connect(function()
-    if not Running then return end
-    local char = LP.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    
-    if hum then
-        -- Paksa Anti Hit kalau AutoSteal nyala, atau kalau togglenya dinyalain
-        if (AntiHit or AutoSteal) and hum.Health < hum.MaxHealth then
-            hum.Health = hum.MaxHealth
-        end
-    end
-
-    if AntiGuard then
-        for _, m in ipairs(Workspace:GetDescendants()) do
-            if m:IsA("Model") and m ~= LP.Character then
-                local h = m:FindFirstChildOfClass("Humanoid")
-                if h and (m.Name:lower():find("guard") or m.Name:lower():find("npc") or m.Name:lower():find("police")) then
-                    h.WalkSpeed = 0; h.JumpPower = 0
+-- Anti Guard (Pindah ke task.spawn biar ga nge-lag UI)
+task.spawn(function()
+    while Running do
+        if not AutoSteal then
+            for _, m in ipairs(Workspace:GetDescendants()) do
+                if m:IsA("Model") and m ~= LP.Character then
+                    local hum = m:FindFirstChildOfClass("Humanoid")
+                    if hum and (m.Name:lower():find("guard") or m.Name:lower():find("npc") or m.Name:lower():find("police")) then
+                        hum.WalkSpeed = 0; hum.JumpPower = 0
+                    end
                 end
             end
         end
+        task.wait(1) -- Cek 1 detik sekali aja biar ga ngeleg
     end
 end)
 
@@ -255,7 +253,7 @@ local TextColor = Color3.fromRGB(255, 255, 255)
 local main
 local renderEggList
 
--- ⚡ TOMBOL BULAT
+-- TOMBOL BULAT
 local circle = new("TextButton", { Parent = gui, Size = UDim2.fromOffset(50, 50), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = RedTheme, Text = "AxD", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 50 })
 corner(circle, 25); stroke(circle, Color3.fromRGB(0,0,0), 2)
 
@@ -288,19 +286,17 @@ circle.MouseButton1Click:Connect(function() if movedBtn < 5 then openPanel() end
 main = new("Frame", { Parent = gui, Size = UDim2.fromOffset(450, 320), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = DarkBG, Visible = false, ZIndex = 10 })
 corner(main, 6); stroke(main, Color3.fromRGB(0,0,0), 2)
 
--- Title Bar
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = RedTheme, ZIndex = 11 })
 corner(titleBar, 6)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v2.2", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v2.3", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 12 })
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = Color3.fromRGB(50, 50, 50), Text = "-", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 16, ZIndex = 12 })
 corner(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = Color3.fromRGB(0,0,0), Text = "X", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 14, ZIndex = 12 })
 corner(closeBtn, 4)
 drag(main, titleBar)
 
--- Side Nav (Kiri)
 local navL = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 285), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11 })
-local navLayout = new("UIListLayout", { Parent = navL, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
+new("UIListLayout", { Parent = navL, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 local function createNavBtn(txt, parent)
     local b = new("TextButton", { Parent = parent, Size = UDim2.fromOffset(100, 35), BackgroundColor3 = RedTheme, Text = txt, TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, AutoButtonColor = false })
     corner(b, 4); stroke(b, Color3.fromRGB(0,0,0), 1.5); return b
@@ -308,22 +304,20 @@ end
 local btnStealTab = createNavBtn("Steal", navL)
 local btnGuardTab = createNavBtn("Guard", navL)
 
--- Side Nav (Kanan)
 local navR = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 285), Position = UDim2.new(1, -100, 0, 35), BackgroundTransparency = 1, ZIndex = 11 })
-local navRLayout = new("UIListLayout", { Parent = navR, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
+new("UIListLayout", { Parent = navR, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 local btnDiscord = createNavBtn("Discord", navR)
 local btnConfig = createNavBtn("Config", navR)
 
--- Content Area
 local content = new("Frame", { Parent = main, Size = UDim2.new(1, -200, 1, -35), Position = UDim2.fromOffset(100, 35), BackgroundColor3 = PanelBG, ZIndex = 11 })
 corner(content, 4)
 
---═════════════ TAB: STEAL ═════════════
+-- TAB STEAL
 local tabSteal = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
 
 local headerSteal = new("Frame", { Parent = tabSteal, Size = UDim2.new(1, -10, 0, 40), Position = UDim2.fromOffset(5, 5), BackgroundColor3 = Color3.fromRGB(40,40,40), ZIndex = 12 })
 corner(headerSteal, 4); stroke(headerSteal, Color3.fromRGB(0,0,0), 1.5)
-new("TextLabel", { Parent = headerSteal, Size = UDim2.fromScale(0.7, 1), Position = UDim2.fromOffset(10,0), BackgroundTransparency = 1, Text = "Auto Steal Fast", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
+new("TextLabel", { Parent = headerSteal, Size = UDim2.fromScale(0.7, 1), Position = UDim2.fromOffset(10,0), BackgroundTransparency = 1, Text = "Auto Steal Fast (Godmode)", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
 
 local toggleStealBg = new("Frame", { Parent = headerSteal, Size = UDim2.fromOffset(40, 20), Position = UDim2.new(1, -50, 0.5, -10), BackgroundColor3 = Color3.fromRGB(80, 20, 20), ZIndex = 13 })
 corner(toggleStealBg, 10); stroke(toggleStealBg, Color3.fromRGB(0,0,0), 1.5)
@@ -346,7 +340,7 @@ corner(infoLabel, 4); stroke(infoLabel, Color3.fromRGB(50,50,50), 1.5)
 local btnOpenList = new("TextButton", { Parent = tabSteal, Size = UDim2.new(1, -10, 0, 40), Position = UDim2.fromOffset(5, 105), BackgroundColor3 = Color3.fromRGB(60, 60, 80), Text = "Select Egg (Pilih Target)", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 corner(btnOpenList, 4); stroke(btnOpenList, Color3.fromRGB(100, 100, 150), 1.5)
 
--- Panel Pop-up List Egg
+-- POPUP LIST EGG
 local eggPopup = new("Frame", { Parent = tabSteal, Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(20, 20, 20), Visible = false, ZIndex = 100 })
 corner(eggPopup, 6); stroke(eggPopup, RedTheme, 2)
 
@@ -368,7 +362,7 @@ local listScroll = new("ScrollingFrame", { Parent = eggPopup, Size = UDim2.new(1
 corner(listScroll, 4); stroke(listScroll, Color3.fromRGB(0,0,0), 1)
 
 local listLayout = new("UIListLayout", { Parent = listScroll, Padding = UDim.new(0, 4), HorizontalAlignment = Enum.HorizontalAlignment.Center })
-local listPad = new("UIPadding", { Parent = listScroll, PaddingTop = UDim.new(0, 5) })
+new("UIPadding", { Parent = listScroll, PaddingTop = UDim.new(0, 5) })
 
 local function updateInfo()
     local count = 0
@@ -383,7 +377,6 @@ renderEggList = function()
     
     local searchText = searchBox.Text:lower()
     local count = 0
-    
     local sortedPets = {}
     for petName, tier in pairs(PetData) do table.insert(sortedPets, {Name = petName, Tier = tier}) end
     table.sort(sortedPets, function(a, b)
@@ -445,45 +438,10 @@ btnBack.MouseButton1Click:Connect(function()
     eggPopup.Visible = false
 end)
 
---═════════════ TAB: GUARD ═════════════
+-- TAB GUARD
 local tabGuard = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
+new("TextLabel", { Parent = tabGuard, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "Godmode Otomatis Aktif!\n(Anti Hit otomatis nyala pas nyolong)", TextColor3 = Color3.fromRGB(200, 200, 200), Font = Enum.Font.GothamBold, TextSize = 14, TextWrapped = true })
 
-local function createGuardToggle(txt, posY)
-    local f = new("Frame", { Parent = tabGuard, Size = UDim2.new(1, -10, 0, 40), Position = UDim2.fromOffset(5, posY), BackgroundColor3 = Color3.fromRGB(40,40,40), ZIndex = 12 })
-    corner(f, 4); stroke(f, Color3.fromRGB(0,0,0), 1.5)
-    new("TextLabel", { Parent = f, Size = UDim2.fromScale(0.7, 1), Position = UDim2.fromOffset(10,0), BackgroundTransparency = 1, Text = txt, TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
-    local bg = new("Frame", { Parent = f, Size = UDim2.fromOffset(40, 20), Position = UDim2.new(1, -50, 0.5, -10), BackgroundColor3 = Color3.fromRGB(80, 20, 20), ZIndex = 13 })
-    corner(bg, 10); stroke(bg, Color3.fromRGB(0,0,0), 1.5)
-    local btn = new("TextButton", { Parent = bg, Size = UDim2.fromOffset(18, 18), Position = UDim2.fromOffset(1, 1), BackgroundColor3 = Color3.fromRGB(255,255,255), Text = "", ZIndex = 14 })
-    corner(btn, 9)
-    return btn, bg
-end
-
-local hitBtn, hitBg = createGuardToggle("Anti Hit (Godmode)", 5)
-local guardBtn, guardBg = createGuardToggle("Anti Guard (Freeze NPC)", 50)
-local hitState, guardState = false, false
-
-hitBtn.MouseButton1Click:Connect(function()
-    hitState = not hitState; AntiHit = hitState
-    TweenService:Create(hitBtn, TweenInfo.new(0.2), {Position = hitState and UDim2.fromOffset(21, 1) or UDim2.fromOffset(1, 1)}):Play()
-    TweenService:Create(hitBg, TweenInfo.new(0.2), {BackgroundColor3 = hitState and RedTheme or Color3.fromRGB(80, 20, 20)}):Play()
-end)
-
-guardBtn.MouseButton1Click:Connect(function()
-    guardState = not guardState; AntiGuard = guardState
-    TweenService:Create(guardBtn, TweenInfo.new(0.2), {Position = guardState and UDim2.fromOffset(21, 1) or UDim2.fromOffset(1, 1)}):Play()
-    TweenService:Create(guardBg, TweenInfo.new(0.2), {BackgroundColor3 = guardState and RedTheme or Color3.fromRGB(80, 20, 20)}):Play()
-    if not guardState then
-        for _, m in ipairs(Workspace:GetDescendants()) do
-            if m:IsA("Model") then
-                local hum = m:FindFirstChildOfClass("Humanoid")
-                if hum and (m.Name:lower():find("guard") or m.Name:lower():find("npc")) then hum.WalkSpeed = 16 end
-            end
-        end
-    end
-end)
-
--- Tab Switch
 local function showTab(tab)
     tabSteal.Visible = tab == "steal"
     tabGuard.Visible = tab == "guard"
@@ -492,13 +450,12 @@ end
 btnStealTab.MouseButton1Click:Connect(function() showTab("steal") end)
 btnGuardTab.MouseButton1Click:Connect(function() showTab("guard") end)
 
--- Close / Min
 minBtn.MouseButton1Click:Connect(function() main.Visible = false; circle.Visible = true end)
 
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 150), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(15, 12, 20), Visible = false, ZIndex = 200 })
 corner(confirm, 12); stroke(confirm, Color3.fromRGB(180, 50, 70), 1.5)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v2.2?\nScript bakal berhenti total.", TextColor3 = Color3.fromRGB(255, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v2.3?", TextColor3 = Color3.fromRGB(255, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.fromOffset(14, 100), BackgroundColor3 = Color3.fromRGB(120, 30, 45), Text = "Ya, Hapus", TextColor3 = Color3.fromRGB(255, 240, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 corner(yesBtn, 8)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.new(1, -124, 0, 100), BackgroundColor3 = Color3.fromRGB(35, 35, 50), Text = "Batal", TextColor3 = Color3.fromRGB(220, 220, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
