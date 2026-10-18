@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v1.3 | Chilli Style | Fix Button & Panel Center
+--  AxD Hub v1.4 | Fix Fatal Error (Tombol Hilang)
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -10,6 +10,18 @@ local Workspace = game:GetService("Workspace")
 
 local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
+
+-- Pake gethui biar aman dari clear game
+local parentGui
+pcall(function()
+    parentGui = gethui and gethui() or game:GetService("CoreGui")
+end)
+if not parentGui then parentGui = PG end
+
+-- Hapus script lama kalau ada
+if parentGui:FindFirstChild("AxDHubV1") then
+    parentGui.AxDHubV1:Destroy()
+end
 
 --═════════════ CONFIG ICONS ═════════════
 local CustomEggIcons = {
@@ -212,20 +224,24 @@ local gui = new("ScreenGui", {
     ResetOnSpawn = false, 
     IgnoreGuiInset = true, 
     ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    DisplayOrder = 999 -- FIX: Biar selalu di paling atas
-}, PG)
+    DisplayOrder = 999 
+}, parentGui)
 
 local RedTheme = Color3.fromRGB(190, 40, 40)
 local DarkBG = Color3.fromRGB(20, 20, 20)
 local PanelBG = Color3.fromRGB(30, 30, 30)
 local TextColor = Color3.fromRGB(255, 255, 255)
 
--- ⚡ TOMBOL BULAT (FIX TENGAH & DRAG)
+-- Variabel dideklarasi dulu biar nggak error
+local main
+local renderEggs
+
+-- ⚡ TOMBOL BULAT
 local circle = new("TextButton", {
     Parent = gui, 
     Size = UDim2.fromOffset(50, 50), 
-    AnchorPoint = Vector2.new(0.5, 0.5), -- Biar center beneran
-    Position = UDim2.fromScale(0.5, 0.5), -- Mulai di tengah layar
+    AnchorPoint = Vector2.new(0.5, 0.5), 
+    Position = UDim2.fromScale(0.5, 0.5), 
     BackgroundColor3 = RedTheme, 
     Text = "AxD", 
     TextColor3 = TextColor, 
@@ -238,6 +254,18 @@ local circle = new("TextButton", {
 corner(circle, 25)
 stroke(circle, Color3.fromRGB(0,0,0), 2)
 
+-- FUNGSI BUKA PANEL (Aman dari error)
+local function openPanel()
+    pcall(function()
+        if main then
+            main.Visible = true
+            circle.Visible = false
+            if renderEggs then renderEggs() end
+        end
+    end)
+end
+
+-- Logika Drag & Klik Tombol
 local draggingBtn, dragStartBtn, startPosBtn, movedBtn = false, nil, nil, 0
 circle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -250,27 +278,29 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStartBtn
-        movedBtn = movedBtn + math.abs(delta.X) + math.abs(delta.Y)
+        movedBtn = movedBtn + delta.Magnitude
         circle.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
     if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
         draggingBtn = false
-        if movedBtn < 10 then -- Kalau gerakan dikit, anggap ngeklik
-            circle.Visible = false
-            main.Visible = true
-            task.spawn(function() pcall(renderEggs) end)
+        if movedBtn < 5 then -- Kalau gerakan sedikit, anggap klik
+            openPanel()
         end
     end
 end)
+-- Backup handler kalau event mobile nge-bug
+circle.MouseButton1Click:Connect(function()
+    if movedBtn < 5 then openPanel() end
+end)
 
--- Main Panel (FIX TENGAH)
-local main = new("Frame", {
+-- Main Panel
+main = new("Frame", {
     Parent = gui, 
     Size = UDim2.fromOffset(450, 300), 
     AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5), -- Selalu di tengah layar
+    Position = UDim2.fromScale(0.5, 0.5), 
     BackgroundColor3 = DarkBG, 
     Visible = false, 
     ZIndex = 10
@@ -380,7 +410,7 @@ toggleStealBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Render Eggs
-function renderEggs()
+renderEggs = function()
     for _, c in ipairs(stealScroll:GetChildren()) do
         if c:IsA("Frame") or c:IsA("TextButton") then c:Destroy() end
     end
