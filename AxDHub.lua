@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v1.1 | Chilli Style | Steal & Guard
+--  AxD Hub v1.2 | Chilli Style | Steal & Guard | Fix Center Button
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -12,7 +12,6 @@ local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
 
 --═════════════ CONFIG ICONS ═════════════
--- Masukin ID icon egg di sini kalau di game nggak nempel (Contoh: ["Golden Egg"] = "rbxassetid://123456789")
 local CustomEggIcons = {
     -- ["NamaEgg"] = "rbxassetid://000000"
 }
@@ -47,6 +46,7 @@ local function stroke(o, color, thick)
     s.Parent = o
 end
 
+-- Drag function buat Panel
 local function drag(frame, handle)
     local dragging, dragStart, startPos
     handle.InputBegan:Connect(function(input)
@@ -74,7 +74,6 @@ local function getHRP()
     return c and c:FindFirstChild("HumanoidRootPart") or nil
 end
 
--- FIX BUG TERBANG: Reset velocity setelah teleport
 local function teleportTo(cf)
     local hrp = getHRP()
     if hrp then
@@ -148,14 +147,12 @@ local function startStealLoop()
                     end
                 end
 
-                -- Kalau egg nggak ada, jangan gerak apa-apa, cuma nunggu
                 if target then
                     local hrp = getHRP()
                     if hrp then
                         teleportTo(target.part.CFrame + Vector3.new(0, 3, 0))
                         task.wait(0.08)
                         
-                        -- Grab Logic
                         for _, d in ipairs(target.model:GetDescendants()) do
                             if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
                         end
@@ -172,7 +169,7 @@ local function startStealLoop()
                         task.wait(0.1)
                     end
                 else
-                    task.wait(0.5) -- Jeda santai kalau nggak ada egg
+                    task.wait(0.5)
                 end
             else
                 task.wait(0.5)
@@ -183,11 +180,10 @@ local function startStealLoop()
 end
 startStealLoop()
 
---═════════════ GUARD LOGIC (ANTI-HIT / ANTI-GUARD) ═════════════
+--═════════════ GUARD LOGIC ═════════════
 RunService.Heartbeat:Connect(function()
     if not Running then return end
     
-    -- Anti Hit
     if AntiHit then
         local char = LP.Character
         if char then
@@ -198,7 +194,6 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- Anti Guard (Bikin penjaga diem)
     if AntiGuard then
         for _, m in ipairs(Workspace:GetDescendants()) do
             if m:IsA("Model") and m ~= LP.Character then
@@ -215,20 +210,55 @@ end)
 --═════════════ UI CREATION ═════════════
 local gui = new("ScreenGui", { Name = "AxDHubV1", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, PG)
 
--- Theme Colors
 local RedTheme = Color3.fromRGB(190, 40, 40)
 local DarkBG = Color3.fromRGB(20, 20, 20)
 local PanelBG = Color3.fromRGB(30, 30, 30)
 local TextColor = Color3.fromRGB(255, 255, 255)
 
--- Tombol Bulat AxD
+-- ⚡ FIX TOMBOL BULAT: Mulai di tengah layar & bisa di-drag
 local circle = new("TextButton", {
-    Parent = gui, Size = UDim2.fromOffset(50, 50), Position = UDim2.new(0, 20, 0.4, 0),
-    BackgroundColor3 = RedTheme, Text = "AxD", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18,
-    AutoButtonColor = false, Visible = true, ZIndex = 50
+    Parent = gui, 
+    Size = UDim2.fromOffset(50, 50), 
+    Position = UDim2.new(0.5, -25, 0.5, -25), -- Posisi awal pas di tengah layar
+    BackgroundColor3 = RedTheme, 
+    Text = "AxD", 
+    TextColor3 = TextColor, 
+    Font = Enum.Font.GothamBlack, 
+    TextSize = 18,
+    AutoButtonColor = false, 
+    Visible = true, 
+    ZIndex = 50
 })
 corner(circle, 25)
 stroke(circle, Color3.fromRGB(0,0,0), 2)
+
+-- Logic Drag & Tap buat Tombol Bulat
+local draggingBtn, dragStartBtn, startPosBtn, movedBtn = false, nil, nil, 0
+circle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingBtn = true
+        dragStartBtn = input.Position
+        startPosBtn = circle.Position
+        movedBtn = 0
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStartBtn
+        movedBtn = movedBtn + delta.Magnitude
+        circle.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        draggingBtn = false
+        if movedBtn < 5 then -- Kalau geserannya dikit, anggap nge-klik (buka panel)
+            circle.Visible = false
+            main.Visible = true
+            renderEggs()
+        end
+    end
+end)
 
 -- Main Panel
 local main = new("Frame", {
@@ -356,7 +386,6 @@ local function renderEggs()
         cb.MouseButton1Click:Connect(function()
             SelectedEggs[name] = not SelectedEggs[name]
             cb.BackgroundColor3 = SelectedEggs[name] and RedTheme or Color3.fromRGB(20,20,20)
-            -- Otomatis set target ke egg pertama yang dicentang
             if SelectedEggs[name] and not TargetEggName then
                 TargetEggName = name
             elseif not SelectedEggs[name] and TargetEggName == name then
@@ -371,7 +400,6 @@ eggLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     stealScroll.CanvasSize = UDim2.new(0, 0, 0, eggLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- Tombol Scan
 local scanBtn = new("TextButton", { Parent = tabSteal, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -35), BackgroundColor3 = RedTheme, Text = "Scan Eggs", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 corner(scanBtn, 4)
 stroke(scanBtn, Color3.fromRGB(0,0,0), 1.5)
@@ -414,7 +442,6 @@ guardBtn.MouseButton1Click:Connect(function()
     TweenService:Create(guardBg, TweenInfo.new(0.2), {BackgroundColor3 = guardState and RedTheme or Color3.fromRGB(80, 20, 20)}):Play()
     
     if not guardState then
-        -- Matiin anti guard, balikin jalan NPC (opsional, biar aman)
         for _, m in ipairs(Workspace:GetDescendants()) do
             if m:IsA("Model") then
                 local hum = m:FindFirstChildOfClass("Humanoid")
@@ -426,7 +453,7 @@ guardBtn.MouseButton1Click:Connect(function()
     end
 end)
 
---═════════════ TAB SWITCH LOGIC ═════════════
+--═════════════ TAB SWITCH & CLOSE ═════════════
 local function showTab(tab)
     tabSteal.Visible = tab == "steal"
     tabGuard.Visible = tab == "guard"
@@ -435,18 +462,10 @@ end
 btnStealTab.MouseButton1Click:Connect(function() showTab("steal") end)
 btnGuardTab.MouseButton1Click:Connect(function() showTab("guard") end)
 
---═════════════ OPEN / CLOSE LOGIC ═════════════
-circle.MouseButton1Click:Connect(function()
-    circle.Visible = false
-    main.Visible = true
-    renderEggs()
-end)
-
 closeBtn.MouseButton1Click:Connect(function()
     main.Visible = false
     circle.Visible = true
 end)
 
--- Auto render awal
 task.wait(1)
 renderEggs()
