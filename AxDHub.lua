@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v4.1 | Break and Steal an Egg (Clean Dark Theme)
+--  AxD Hub v4.2 | Fixed TP, 1T Damage Hook, & Draggable UI
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -16,7 +16,7 @@ pcall(function() parentGui = gethui and gethui() or game:GetService("CoreGui") e
 if not parentGui then parentGui = PG end
 if parentGui:FindFirstChild("AxDHubV1") then parentGui.AxDHubV1:Destroy() end
 
--- ═════════════ DATA ZONES & EGGS (Sesuai List Lu) ═════════════
+-- ═════════════ DATA ZONES & EGGS ═════════════
 local ZoneData = {
     ["Forest"] = {"Rock Egg", "Forest Egg"},
     ["Desert"] = {"Cactus Egg", "Bones Egg"},
@@ -51,29 +51,12 @@ local function applyCleanStyle(obj, rad)
     local s = Instance.new("UIStroke"); s.Color = Color3.fromRGB(255,255,255); s.Thickness = 1; s.Transparency = 0.85; s.Parent = obj
 end
 
-local function drag(frame, handle)
-    local dragging, dragStart, startPos
-    handle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; dragStart = input.Position; startPos = frame.Position
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = false end
-    end)
-end
-
 local function getHRP()
     local c = LP.Character
     return c and c:FindFirstChild("HumanoidRootPart") or nil
 end
 
+-- Paksa Safe Zone
 local function getSafeZone()
     if SafeZonePart and SafeZonePart.Parent then return SafeZonePart end
     for _, o in ipairs(Workspace:GetDescendants()) do
@@ -89,7 +72,26 @@ local function getSafeZone()
     return nil
 end
 
--- ═════════════ LOGIKA BREAK & STEAL ═════════════
+-- ═════════════ DAMAGE HOOK (BIAR 1T) ═════════════
+-- Hook ini nangkep sinyal damage ke server dan maksa angkanya jadi 1 Triliun
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
+        for i, v in pairs(args) do
+            if type(v) == "number" and v > 0 and v < 1000000 then
+                -- Kalau angkanya mirip damage (misal 1-10000), timpa jadi 1T
+                args[i] = 1000000000000
+            end
+        end
+    end
+    
+    return oldNamecall(self, unpack(args))
+end)
+
+-- ═════════════ LOGIKA BREAK ═════════════
 local function startBreakLoop()
     task.spawn(function()
         while Running do
@@ -101,12 +103,12 @@ local function startBreakLoop()
                     local targetEgg = nil
                     for eggName, active in pairs(SelectedEggs) do
                         if active then
-                            -- Cari model telur di Workspace
+                            -- Nyari model dengan nama yang PERSIS SAMA
                             for _, obj in ipairs(Workspace:GetDescendants()) do
-                                if obj:IsA("Model") and string.find(string.lower(obj.Name), string.lower(eggName)) then
+                                if obj:IsA("Model") and string.lower(obj.Name) == string.lower(eggName) then
                                     local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
                                     local safe = getSafeZone()
-                                    -- Pastikan bukan egg yang ada di dalem base
+                                    -- Jarak > 50 studs berarti di luar base
                                     if part and (not safe or (part.Position - safe.Position).Magnitude > 50) then
                                         targetEgg = {model = obj, part = part}
                                         break
@@ -118,66 +120,53 @@ local function startBreakLoop()
                     end
                     
                     if targetEgg then
-                        if StatusLabel then StatusLabel.Text = "Status: Breaking & Stealing!" end
+                        if StatusLabel then StatusLabel.Text = "Status: Breaking " .. targetEgg.model.Name end
                         
-                        -- 1. Teleport ke Egg
-                        hrp.CFrame = targetEgg.part.CFrame + Vector3.new(0, 3, 0)
+                        -- Teleport ke atas telur
+                        hrp.CFrame = targetEgg.part.CFrame + Vector3.new(0, 5, 0)
                         hrp.AssemblyLinearVelocity = Vector3.zero
                         hrp.AssemblyAngularVelocity = Vector3.zero
                         task.wait(0.1)
                         
-                        -- 2. Equip Pickaxe & Hack Damage 1T
+                        -- Equip Pickaxe
                         local char = LP.Character
+                        local tool = nil
                         if char then
-                            local tool = char:FindFirstChildWhichIsA("Tool")
+                            tool = char:FindFirstChildWhichIsA("Tool")
                             if not tool then
                                 local bp = LP:FindFirstChild("Backpack")
                                 if bp then
-                                    -- Cari Pickaxe di backpack (biasanya slot 1)
                                     local pick = bp:FindFirstChild("Pickaxe") or bp:FindFirstChildWhichIsA("Tool")
-                                    if pick then char.Humanoid:EquipTool(pick) end
-                                end
-                            end
-                            
-                            -- Paksa Damage 1T
-                            if tool then
-                                for _, v in ipairs(tool:GetDescendants()) do
-                                    if v:IsA("NumberValue") or v:IsA("IntValue") then
-                                        if string.find(string.lower(v.Name), "damage") or string.find(string.lower(v.Name), "power") then
-                                            pcall(function() v.Value = 1000000000000 end) -- 1T
-                                        end
-                                    end
-                                end
-                                -- Spam Activate tool (mukul)
-                                for i = 1, 10 do
-                                    pcall(function() tool:Activate() end)
-                                    task.wait(0.03)
+                                    if pick then char.Humanoid:EquipTool(pick); tool = pick end
                                 end
                             end
                         end
                         
-                        -- 3. Fire Prompts & Touch untuk ambil pet/egg
+                        -- Spam Klik & Touch (Damage udh di-hook jadi 1T)
+                        for i = 1, 20 do
+                            if not targetEgg.model.Parent then break end
+                            if tool then pcall(function() tool:Activate() end) end
+                            pcall(function() firetouchinterest(hrp, targetEgg.part, 0) end)
+                            pcall(function() firetouchinterest(hrp, targetEgg.part, 1) end)
+                            task.wait(0.02)
+                        end
+                        
+                        -- Ambil Pet / Prompt
                         for _, d in ipairs(targetEgg.model:GetDescendants()) do
                             if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
                             if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
                         end
-                        for _, p in ipairs(targetEgg.model:GetDescendants()) do
-                            if p:IsA("BasePart") then
-                                pcall(function() firetouchinterest(hrp, p, 0) end)
-                                pcall(function() firetouchinterest(hrp, p, 1) end)
-                            end
-                        end
                         
-                        task.wait(0.2)
+                        task.wait(0.1)
                         if StatusLabel then StatusLabel.Text = "Status: Balik ke Safe Zone" end
                         
-                        -- 4. Balik ke Safe Zone
+                        -- Kabur ke Safe Zone
                         local safe = getSafeZone()
                         if safe then 
-                            hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) 
+                            hrp.CFrame = safe.CFrame + Vector3.new(0, 5, 0) 
                             hrp.AssemblyLinearVelocity = Vector3.zero
                         end
-                        task.wait(0.3)
+                        task.wait(0.2)
                     else
                         task.wait(0.5)
                     end
@@ -192,17 +181,16 @@ local function startBreakLoop()
 end
 startBreakLoop()
 
--- ═════════════ UI CREATION (Hitam Bersih) ═════════════
+-- ═════════════ UI CREATION ═════════════
 local gui = new("ScreenGui", { Name = "AxDHubV1", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999 }, parentGui)
 
--- Tema Hitam Doff
 local MainBg = Color3.fromRGB(15, 15, 15)
 local DarkPanel = Color3.fromRGB(25, 25, 25)
 local WhiteText = Color3.fromRGB(255, 255, 255)
 local GreyText = Color3.fromRGB(150, 150, 150)
 
--- Floating Button
-local circle = new("TextButton", { Parent = gui, Size = UDim2.fromOffset(50, 50), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Text = "AxD", TextColor3 = WhiteText, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 50 })
+-- FLOATING BUTTON
+local circle = new("TextButton", { Parent = gui, Size = UDim2.fromOffset(50, 50), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = MainBg, Text = "AxD", TextColor3 = WhiteText, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 50 })
 applyCleanStyle(circle, 25)
 
 -- Main Window
@@ -211,13 +199,62 @@ applyCleanStyle(main, 8)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyCleanStyle(titleBar, 8)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.1", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.2", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = DarkPanel, Text = "-", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 applyCleanStyle(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = DarkPanel, Text = "X", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 applyCleanStyle(closeBtn, 4)
-drag(main, titleBar)
+
+-- Logic Drag buat tombol AxD (FIX)
+local draggingBtn, dragStartBtn, startPosBtn, movedBtn
+circle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingBtn = true
+        dragStartBtn = input.Position
+        startPosBtn = circle.Position
+        movedBtn = 0
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStartBtn
+        movedBtn = movedBtn + delta.Magnitude
+        circle.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        draggingBtn = false
+        if movedBtn < 5 then -- Kalau cuma di-tap
+            main.Visible = true
+            circle.Visible = false
+        end
+    end
+end)
+
+-- Logic Drag buat Panel (FIX)
+local draggingPanel, dragStartPanel, startPosPanel
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        draggingPanel = true
+        dragStartPanel = input.Position
+        startPosPanel = main.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStartPanel
+        main.Position = UDim2.new(startPosPanel.X.Scale, startPosPanel.X.Offset + delta.X, startPosPanel.Y.Scale, startPosPanel.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        draggingPanel = false
+    end
+end)
+
+minBtn.MouseButton1Click:Connect(function() main.Visible = false; circle.Visible = true end)
 
 -- Sidebar
 local navL = new("Frame", { Parent = main, Size = UDim2.fromOffset(90, 315), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11 })
@@ -232,7 +269,6 @@ end
 local btnBreak = createNavBtn("Break")
 local btnSteal = createNavBtn("Steal")
 
--- Konten Utama
 local content = new("Frame", { Parent = main, Size = UDim2.new(1, -100, 1, -70), Position = UDim2.fromOffset(90, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyCleanStyle(content, 6)
 
@@ -256,27 +292,21 @@ local eggLayout = new("UIListLayout", { Parent = eggScroll, Padding = UDim.new(0
 local btnStart = new("TextButton", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -35), BackgroundColor3 = Color3.fromRGB(30, 80, 40), Text = "Start Break", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12, Visible = false })
 applyCleanStyle(btnStart, 6)
 
--- Render Egg berdasarkan Zone
 local function renderEggs()
     for _, c in ipairs(eggScroll:GetChildren()) do
         if c:IsA("Frame") or c:IsA("TextButton") then c:Destroy() end
     end
-    
     local count = 0
     for zName, isZSelected in pairs(SelectedZones) do
         if isZSelected then
             for _, eName in ipairs(ZoneData[zName]) do
                 count = count + 1
                 local isSelected = SelectedEggs[eName] == true
-                
                 local row = new("Frame", { Parent = eggScroll, Size = UDim2.new(1, -5, 0, 30), BackgroundColor3 = DarkPanel, LayoutOrder = count, ZIndex = 13 })
                 applyCleanStyle(row, 4)
-                
                 new("TextLabel", { Parent = row, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = eName, TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14 })
-                
                 local cb = new("TextButton", { Parent = row, Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -25, 0.5, -10), BackgroundColor3 = isSelected and WhiteText or MainBg, Text = "", ZIndex = 14 })
                 applyCleanStyle(cb, 4)
-                
                 cb.MouseButton1Click:Connect(function()
                     local isNow = not (SelectedEggs[eName] == true)
                     SelectedEggs[eName] = isNow
@@ -289,16 +319,12 @@ local function renderEggs()
     eggScroll.CanvasSize = UDim2.new(0, 0, 0, eggLayout.AbsoluteContentSize.Y + 5)
 end
 
--- Render Zone
 for zName, _ in pairs(ZoneData) do
     local row = new("Frame", { Parent = zoneScroll, Size = UDim2.new(1, -5, 0, 25), BackgroundColor3 = DarkPanel, ZIndex = 13 })
     applyCleanStyle(row, 4)
-    
     new("TextLabel", { Parent = row, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = zName, TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14 })
-    
     local cb = new("TextButton", { Parent = row, Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -25, 0.5, -10), BackgroundColor3 = MainBg, Text = "", ZIndex = 14 })
     applyCleanStyle(cb, 4)
-    
     cb.MouseButton1Click:Connect(function()
         local isNow = not (SelectedZones[zName] == true)
         SelectedZones[zName] = isNow
@@ -318,11 +344,10 @@ btnStart.MouseButton1Click:Connect(function()
     end
 end)
 
--- ═════════════ TAB STEAL (Placeholder) ═════════════
+-- ═════════════ TAB STEAL ═════════════
 local tabSteal = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
-new("TextLabel", { Parent = tabSteal, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "Fitur Steal menyusul di update berikutnya.", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13 })
+new("TextLabel", { Parent = tabSteal, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "Fitur Steal menyusul.", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13 })
 
--- Switch Tab
 local function switchTab(tab)
     tabBreak.Visible = tab == "break"
     tabSteal.Visible = tab == "steal"
@@ -332,14 +357,10 @@ end
 btnBreak.MouseButton1Click:Connect(function() switchTab("break") end)
 btnSteal.MouseButton1Click:Connect(function() switchTab("steal") end)
 
--- Open/Close
-circle.MouseButton1Click:Connect(function() main.Visible = true; circle.Visible = false end)
-minBtn.MouseButton1Click:Connect(function() main.Visible = false; circle.Visible = true end)
-
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 200 })
 applyCleanStyle(confirm, 8)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.1?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.2?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.fromOffset(14, 80), BackgroundColor3 = Color3.fromRGB(100, 30, 30), Text = "Ya", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 applyCleanStyle(yesBtn, 6)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.new(1, -114, 0, 80), BackgroundColor3 = DarkPanel, Text = "Batal", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
