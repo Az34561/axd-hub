@@ -1,6 +1,9 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v5.1 | Solid UI, Separate Pet Info, & Smart Break
+--  AxD Hub v5.2 | Smart Pickup & Live Reload
 --══════════════════════════════════════════════════════════════
+
+-- ⚠️ MASUKIN LINK RAW GITHUB LU DI SINI BUAT FITUR RELOAD ⚠️
+local ScriptURL = "https://raw.githubusercontent.com/..." 
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -14,46 +17,16 @@ if PG:FindFirstChild("AxDHubV1") then PG.AxDHubV1:Destroy() end
 
 -- ═════════════ DATA LENGKAP ═════════════
 local EggDatabase = {
-    ["Planet X"] = {
-        eggs = {"Plasma Egg", "Nebula Egg", "Supernova Egg"},
-        pets = "Bug, Crystal Lizard, Crystal Beast, Crystal Raptor, Crystal Dragon, Mantis, Alien Jellyfish, Crystal Scorpion, Behemoth, Crystal Wolf, Celestial Beast, Celestial Spirit"
-    },
-    ["Forest Zone"] = {
-        eggs = {"Rock Egg", "Forest Egg"},
-        pets = "Chicken, Dog, Bird, Owl, Raccoon, Bear, Fox, Brr Brr Patapim"
-    },
-    ["Desert Zone"] = {
-        eggs = {"Cactus Egg", "Bones Egg"},
-        pets = "Jerboa, Fennec, Camel, Tob Tobi Tob Tob, Snake, Scorpion, Sand Spider, Royal Sphinx"
-    },
-    ["Snowy Zone"] = {
-        eggs = {"Frozen Egg", "Yeti Egg"},
-        pets = "Penguin, Snowman, Arctic Fox, Seal, Polar Bear, Yeti, Ice Dragon, El Maja"
-    },
-    ["Candy Zone"] = {
-        eggs = {"Candy Egg", "Rainbow Egg", "Easter Bunny Egg"},
-        pets = "Gummy Bear, Lollipop Cat, Cotton Candy Dog, Marshmallow Bunny, Chocolate Dragon, Candy Serpent"
-    },
-    ["Swamp Zone"] = {
-        eggs = {"Gooey Egg", "Tree Egg", "Lake Egg"},
-        pets = "Frog, Duckling, Catfish, Turtle, Swan, Axolotl, Crocodile, Leviathan"
-    },
-    ["Ocean Zone"] = {
-        eggs = {"Sea Stones Egg", "Water Egg", "Sea Egg"},
-        pets = "Starfish, Clownfish, Shark, Dolphin, Orca, Octopus, Demon Crab, Kraken"
-    },
-    ["Volcano Zone"] = {
-        eggs = {"Fallen Angel Egg", "Angel Egg", "Volcanic Egg"},
-        pets = "Fire Imp, Magma Gorilla, Phoenix, Lava Hound, Lava Dragon, Nightflame"
-    },
-    ["Blossom Zone"] = {
-        eggs = {"Blossom Egg", "Bamboo Egg", "Fortune Egg"},
-        pets = "Panda, Crane, Tanuki, Samurai Cat, Kitsune, Jade Dragon, Chimera Guardian"
-    },
-    ["Galaxy Zone"] = {
-        eggs = {"Sun Egg", "Starry Egg", "Blackhole Egg"},
-        pets = "Alien, Astronaut Dog, Star Cat, Meteor Golem, Galaxy Hydra, Cosmic Dragon"
-    }
+    ["Planet X"] = { eggs = {"Plasma Egg", "Nebula Egg", "Supernova Egg"}, pets = "Bug, Crystal Lizard, Crystal Beast, Crystal Raptor, Crystal Dragon, Mantis, Alien Jellyfish, Crystal Scorpion, Behemoth, Crystal Wolf, Celestial Beast, Celestial Spirit" },
+    ["Forest Zone"] = { eggs = {"Rock Egg", "Forest Egg"}, pets = "Chicken, Dog, Bird, Owl, Raccoon, Bear, Fox, Brr Brr Patapim" },
+    ["Desert Zone"] = { eggs = {"Cactus Egg", "Bones Egg"}, pets = "Jerboa, Fennec, Camel, Tob Tobi Tob Tob, Snake, Scorpion, Sand Spider, Royal Sphinx" },
+    ["Snowy Zone"] = { eggs = {"Frozen Egg", "Yeti Egg"}, pets = "Penguin, Snowman, Arctic Fox, Seal, Polar Bear, Yeti, Ice Dragon, El Maja" },
+    ["Candy Zone"] = { eggs = {"Candy Egg", "Rainbow Egg", "Easter Bunny Egg"}, pets = "Gummy Bear, Lollipop Cat, Cotton Candy Dog, Marshmallow Bunny, Chocolate Dragon, Candy Serpent" },
+    ["Swamp Zone"] = { eggs = {"Gooey Egg", "Tree Egg", "Lake Egg"}, pets = "Frog, Duckling, Catfish, Turtle, Swan, Axolotl, Crocodile, Leviathan" },
+    ["Ocean Zone"] = { eggs = {"Sea Stones Egg", "Water Egg", "Sea Egg"}, pets = "Starfish, Clownfish, Shark, Dolphin, Orca, Octopus, Demon Crab, Kraken" },
+    ["Volcano Zone"] = { eggs = {"Fallen Angel Egg", "Angel Egg", "Volcanic Egg"}, pets = "Fire Imp, Magma Gorilla, Phoenix, Lava Hound, Lava Dragon, Nightflame" },
+    ["Blossom Zone"] = { eggs = {"Blossom Egg", "Bamboo Egg", "Fortune Egg"}, pets = "Panda, Crane, Tanuki, Samurai Cat, Kitsune, Jade Dragon, Chimera Guardian" },
+    ["Galaxy Zone"] = { eggs = {"Sun Egg", "Starry Egg", "Blackhole Egg"}, pets = "Alien, Astronaut Dog, Star Cat, Meteor Golem, Galaxy Hydra, Cosmic Dragon" }
 }
 
 local SelectedZones = {}
@@ -71,7 +44,6 @@ local function new(cls, props, parent)
     return o
 end
 
--- GANTI JADI SOLID (OPAQUE)
 local function applyStyle(obj, rad)
     local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, rad or 6); c.Parent = obj
     local s = Instance.new("UIStroke"); s.Color = Color3.fromRGB(100, 100, 110); s.Thickness = 1; s.Transparency = 0; s.Parent = obj
@@ -97,7 +69,7 @@ local function getSafeZone()
     return nil
 end
 
--- ═════════════ LOGIKA BREAK (FIX TP NGAMBANG) ═════════════
+-- ═════════════ LOGIKA BREAK (FIX PICKUP) ═════════════
 local function startBreakLoop()
     task.spawn(function()
         while Running do
@@ -108,6 +80,7 @@ local function startBreakLoop()
                     local targetEgg = nil
                     local targetName = nil
                     
+                    -- Cari Egg
                     for eggName, active in pairs(SelectedEggs) do
                         if active then
                             for _, obj in ipairs(Workspace:GetDescendants()) do
@@ -128,12 +101,11 @@ local function startBreakLoop()
                     if targetEgg then
                         if StatusLabel then StatusLabel.Text = "Status: Breaking " .. targetName end
                         
-                        -- TELEPORT PAS DI DEPAN TELUR (Bukan ke atas)
                         hrp.CFrame = targetEgg.part.CFrame * CFrame.new(0, 0, -3)
                         hrp.AssemblyLinearVelocity = Vector3.zero
-                        task.wait(0.5) -- Tunggu server load posisi
+                        task.wait(0.2)
                         
-                        -- Equip Pickaxe
+                        -- Equip Tool
                         local tool = LP.Character and LP.Character:FindFirstChildWhichIsA("Tool")
                         if not tool and LP.Backpack then
                             local pick = LP.Backpack:FindFirstChild("Pickaxe") or LP.Backpack:FindFirstChildWhichIsA("Tool")
@@ -143,7 +115,7 @@ local function startBreakLoop()
                             end
                         end
                         
-                        -- Hajar Telur Sampe Pecah (Max 2 detik)
+                        -- Hajar Telur
                         local startTime = tick()
                         local isBroken = false
                         while tick() - startTime < 2.0 do
@@ -151,7 +123,6 @@ local function startBreakLoop()
                                 isBroken = true 
                                 break 
                             end
-                            
                             if tool then pcall(function() tool:Activate() end) end
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 0) end)
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 1) end)
@@ -159,12 +130,40 @@ local function startBreakLoop()
                         end
                         
                         if isBroken or not targetEgg.model.Parent then
-                            if StatusLabel then StatusLabel.Text = "Status: Sukses! Balik ke Safe Zone" end
-                            for _, d in ipairs(targetEgg.model:GetDescendants()) do
-                                if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
-                                if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
+                            if StatusLabel then StatusLabel.Text = "Status: Telur Pecah! Mencari Pet..." end
+                            task.wait(0.3) -- Tunggu drop spawn
+                            
+                            -- CARI PET DROP DI SEKITAR AREA
+                            local drop = nil
+                            for _, obj in ipairs(Workspace:GetDescendants()) do
+                                if obj:IsA("Tool") or (obj:IsA("Model") and (obj:FindFirstChildWhichIsA("ProximityPrompt", true) or obj:FindFirstChildWhichIsA("ClickDetector", true))) then
+                                    local dp = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
+                                    if dp and (dp.Position - targetEgg.part.Position).Magnitude < 30 then
+                                        drop = obj
+                                        break
+                                    end
+                                end
                             end
-                            task.wait(0.2)
+                            
+                            -- AMBIL PET
+                            if drop then
+                                if StatusLabel then StatusLabel.Text = "Status: Mengambil Pet!" end
+                                local dp = drop:IsA("BasePart") and drop or drop:FindFirstChildWhichIsA("BasePart", true)
+                                if dp then
+                                    hrp.CFrame = dp.CFrame + Vector3.new(0, 2, 0)
+                                    task.wait(0.1)
+                                    for _, d in ipairs(drop:GetDescendants()) do
+                                        if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
+                                        if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
+                                    end
+                                    pcall(function() firetouchinterest(hrp, dp, 0) end)
+                                    pcall(function() firetouchinterest(hrp, dp, 1) end)
+                                    task.wait(0.2)
+                                end
+                            end
+                            
+                            -- BALIK KE SAFE ZONE
+                            if StatusLabel then StatusLabel.Text = "Status: Balik ke Safe Zone" end
                             local safe = getSafeZone()
                             if safe then 
                                 hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) 
@@ -172,7 +171,7 @@ local function startBreakLoop()
                             end
                             task.wait(0.5)
                         else
-                            if StatusLabel then StatusLabel.Text = "Status: Gagal pecah, lanjut egg lain..." end
+                            if StatusLabel then StatusLabel.Text = "Status: Gagal pecah, skip..." end
                             task.wait(0.5)
                         end
                     else
@@ -189,7 +188,7 @@ local function startBreakLoop()
 end
 startBreakLoop()
 
--- ═════════════ UI CREATION (WARNA PADAT) ═════════════
+-- ═════════════ UI CREATION ═════════════
 local gui = new("ScreenGui", { Name = "AxDHubV1", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999 }, PG)
 
 local MainBg = Color3.fromRGB(15, 15, 15)
@@ -208,7 +207,7 @@ applyStyle(main, 8)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyStyle(titleBar, 8)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v5.1", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v5.2", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = BtnBg, Text = "-", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 applyStyle(minBtn, 4)
@@ -282,8 +281,24 @@ new("TextLabel", { Parent = tabHome, Size = UDim2.new(1, -110, 0, 25), Position 
 local pingLabel = new("TextLabel", { Parent = tabHome, Size = UDim2.new(1, -110, 0, 20), Position = UDim2.fromOffset(100, 40), BackgroundTransparency = 1, Text = "Ping: 0 ms", TextColor3 = GreyText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
 task.spawn(function() while Running do pcall(function() pingLabel.Text = "Ping: " .. math.floor(LP:GetNetworkPing() * 1000) .. " ms" end); task.wait(1) end end)
 
-local btnReload = new("TextButton", { Parent = tabHome, Size = UDim2.new(1, -20, 0, 35), Position = UDim2.fromOffset(10, 100), BackgroundColor3 = BtnBg, Text = "Reload Script", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 13 })
+local btnReload = new("TextButton", { Parent = tabHome, Size = UDim2.new(1, -20, 0, 35), Position = UDim2.fromOffset(10, 100), BackgroundColor3 = BtnBg, Text = "Reload Script (Live Update)", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 13 })
 applyStyle(btnReload, 6)
+
+-- LOGIKA RELOAD SCRIPT DARI GITHUB (Tanpa Rejoin)
+btnReload.MouseButton1Click:Connect(function()
+    if ScriptURL == "https://raw.githubusercontent.com/..." or ScriptURL == "" then
+        btnReload.Text = "URL GitHub Belum Diisi!"
+        task.wait(2)
+        btnReload.Text = "Reload Script (Live Update)"
+    else
+        btnReload.Text = "Menghapus & Mendownload..."
+        gui:Destroy() -- Hapus UI lama
+        task.wait(0.5)
+        pcall(function()
+            loadstring(game:HttpGet(ScriptURL))() -- Download & Jalanin script baru
+        end)
+    end
+end)
 
 -- ═════════════ TAB BREAK ═════════════
 local tabBreak = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
@@ -299,16 +314,14 @@ local eggScroll = new("ScrollingFrame", { Parent = tabBreak, Size = UDim2.new(1,
 applyStyle(eggScroll, 4)
 local eggLayout = new("UIListLayout", { Parent = eggScroll, Padding = UDim.new(0, 3), HorizontalAlignment = Enum.HorizontalAlignment.Center })
 
--- KOTAK INFO PET (TERPISAH DARI EGG)
+-- Kotak Info Pet
 local petInfoBox = new("TextLabel", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 45), Position = UDim2.fromOffset(5, 225), BackgroundColor3 = MainBg, Text = "Pets: (Pilih telur untuk lihat isinya)", TextColor3 = GreyText, Font = Enum.Font.Gotham, TextSize = 10, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 12 })
 applyStyle(petInfoBox, 4)
-local pad = new("UIPadding", { Parent = petInfoBox })
-pad.PaddingLeft = UDim.new(0, 5); pad.PaddingTop = UDim.new(0, 5)
+local pad = new("UIPadding", { Parent = petInfoBox }); pad.PaddingLeft = UDim.new(0, 5); pad.PaddingTop = UDim.new(0, 5)
 
 local btnStart = new("TextButton", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -35), BackgroundColor3 = Color3.fromRGB(40, 100, 50), Text = "Start Break", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12, Visible = false })
 applyStyle(btnStart, 6)
 
--- Render Eggs & Pet Info
 local function renderEggs()
     for _, c in ipairs(eggScroll:GetChildren()) do
         if c:IsA("Frame") or c:IsA("TextButton") then c:Destroy() end
@@ -326,15 +339,10 @@ local function renderEggs()
                     applyStyle(row, 4)
                     
                     local btnName = new("TextButton", { Parent = row, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = eName, TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14 })
-                    
-                    -- Pas diklik, munculin info pet di kotak bawah
-                    btnName.MouseButton1Click:Connect(function()
-                        petInfoBox.Text = "Pets inside " .. eName .. ":\n" .. zoneData.pets
-                    end)
+                    btnName.MouseButton1Click:Connect(function() petInfoBox.Text = "Pets inside " .. eName .. ":\n" .. zoneData.pets end)
                     
                     local cb = new("TextButton", { Parent = row, Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -25, 0.5, -10), BackgroundColor3 = isSelected and WhiteText or MainBg, Text = "", ZIndex = 14 })
                     applyStyle(cb, 4)
-                    
                     cb.MouseButton1Click:Connect(function()
                         local isNow = not (SelectedEggs[eName] == true)
                         SelectedEggs[eName] = isNow
@@ -355,7 +363,6 @@ for zName, _ in pairs(EggDatabase) do
     
     local cb = new("TextButton", { Parent = row, Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -25, 0.5, -10), BackgroundColor3 = MainBg, Text = "", ZIndex = 14 })
     applyStyle(cb, 4)
-    
     cb.MouseButton1Click:Connect(function()
         local isNow = not (SelectedZones[zName] == true)
         SelectedZones[zName] = isNow
@@ -363,9 +370,7 @@ for zName, _ in pairs(EggDatabase) do
         renderEggs()
     end)
 end
-zoneLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    zoneScroll.CanvasSize = UDim2.new(0, 0, 0, zoneLayout.AbsoluteContentSize.Y + 5)
-end)
+zoneLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() zoneScroll.CanvasSize = UDim2.new(0, 0, 0, zoneLayout.AbsoluteContentSize.Y + 5) end)
 
 btnStart.MouseButton1Click:Connect(function()
     if next(SelectedEggs) then
@@ -394,7 +399,7 @@ btnSteal.MouseButton1Click:Connect(function() switchTab("steal") end)
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 200 })
 applyStyle(confirm, 8)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v5.1?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v5.2?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.fromOffset(14, 80), BackgroundColor3 = Color3.fromRGB(150, 40, 40), Text = "Ya", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 applyStyle(yesBtn, 6)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.new(1, -114, 0, 80), BackgroundColor3 = BtnBg, Text = "Batal", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
