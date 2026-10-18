@@ -3,7 +3,7 @@
 --══════════════════════════════════════════════════════════════
 
 -- ⚠️ MASUKIN LINK RAW GITHUB LU DI SINI BUAT FITUR RELOAD ⚠️
-local ScriptURL = "https://raw.githubusercontent.com/..." 
+local ScriptURL = "https://raw.githubusercontent.com/Az34561/axd-hub/refs/heads/main/AxDHub.lua" 
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
