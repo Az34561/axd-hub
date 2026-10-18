@@ -1,6 +1,11 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v4.5 | Final Fix: Home Tab, Logo, & Lightning Break
+--  AxD Hub v4.6 | Bulletproof UI & Lightning Break
 --══════════════════════════════════════════════════════════════
+
+-- Kasih notif kalau script mulai jalan
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {Title = "AxD Hub", Text = "Loading UI...", Duration = 3})
+end)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -33,7 +38,6 @@ local ZoneData = {
     ["Planet X"] = {"Plasma Egg", "Supernova Egg", "Celestial Egg"}
 }
 
--- ═════════════ STATE ═════════════
 local SelectedZones = {}
 local SelectedEggs = {}
 local AutoBreak = false
@@ -44,7 +48,9 @@ local StatusLabel
 -- ═════════════ HELPERS ═════════════
 local function new(cls, props, parent)
     local o = Instance.new(cls)
-    for k, v in pairs(props or {}) do o[k] = v end
+    for k, v in pairs(props or {}) do 
+        pcall(function() o[k] = v end) -- Anti crash kalau properti salah
+    end
     if parent then o.Parent = parent end
     return o
 end
@@ -87,7 +93,6 @@ local function startBreakLoop()
                     for eggName, active in pairs(SelectedEggs) do
                         if active then
                             for _, obj in ipairs(Workspace:GetDescendants()) do
-                                -- Nyari nama Part atau Model yang ada kata egg-nya
                                 if (obj:IsA("Model") or obj:IsA("BasePart")) and string.find(string.lower(obj.Name), string.lower(eggName)) then
                                     local part = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true))
                                     local safe = getSafeZone()
@@ -104,28 +109,30 @@ local function startBreakLoop()
                     if targetEgg then
                         if StatusLabel then StatusLabel.Text = "Status: Lightning Break!" end
                         
-                        -- Teleport ke atas telur
                         hrp.CFrame = targetEgg.part.CFrame + Vector3.new(0, 3, 0)
                         hrp.AssemblyLinearVelocity = Vector3.zero
                         task.wait(0.05)
                         
-                        -- Equip Tool
+                        -- Equip Tool (Aman)
                         local tool = LP.Character and LP.Character:FindFirstChildWhichIsA("Tool")
                         if not tool and LP.Backpack then
                             local pick = LP.Backpack:FindFirstChild("Pickaxe") or LP.Backpack:FindFirstChildWhichIsA("Tool")
-                            if pick then LP.Character.Humanoid:EquipTool(pick); tool = pick end
+                            if pick and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
+                                pcall(function() LP.Character:FindFirstChildOfClass("Humanoid"):EquipTool(pick) end)
+                                tool = pick
+                            end
                         end
                         
-                        -- Mukul Secepat Kilat (Spam 1 detik)
+                        -- Mukul Kilat (Pakai RenderStepped)
                         local hitTime = tick()
                         while tick() - hitTime < 1.0 and targetEgg.model.Parent do
                             if tool then pcall(function() tool:Activate() end) end
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 0) end)
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 1) end)
-                            RunService.RenderStepped:Wait() -- Nunggu frame berikutnya (super cepat)
+                            RunService.RenderStepped:Wait() 
                         end
                         
-                        -- Ambil prompt
+                        -- Ambil prompt (Aman)
                         for _, d in ipairs(targetEgg.model:GetDescendants()) do
                             if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
                             if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
@@ -160,20 +167,19 @@ local DarkPanel = Color3.fromRGB(25, 25, 25)
 local WhiteText = Color3.fromRGB(255, 255, 255)
 local GreyText = Color3.fromRGB(150, 150, 150)
 
--- ═════════════ TOMBOL BULAT (LOGO LU) ═════════════
+-- TOMBOL BULAT (ANTI CRASH)
 local circle = new("TextButton", { 
     Parent = gui, 
-    Size = UDim2.fromOffset(60, 60), -- Ukuran disesuaikan biar logo jelas
+    Size = UDim2.fromOffset(60, 60), 
     Position = UDim2.fromScale(0.5, 0.5), 
     AnchorPoint = Vector2.new(0.5, 0.5), 
     BackgroundColor3 = MainBg, 
     BackgroundTransparency = 1, 
-    Text = "", -- HAPUS TEKS AXD
-    Image = "rbxassetid://135210246009589", -- LOGO LU
-    ImageColor3 = Color3.fromRGB(255, 255, 255),
-    ScaleType = Enum.ScaleType.Crop,
+    Text = "", 
+    ScaleType = Enum.ScaleType.Crop, 
     ZIndex = 50 
 })
+pcall(function() circle.Image = "rbxassetid://135210246009589" end) -- Set gambar pake pcall biar ga crash
 local cornerBtn = Instance.new("UICorner"); cornerBtn.CornerRadius = UDim.new(1, 0); cornerBtn.Parent = circle
 local strokeBtn = Instance.new("UIStroke"); strokeBtn.Color = Color3.fromRGB(255,255,255); strokeBtn.Thickness = 2; strokeBtn.Transparency = 0.4; strokeBtn.Parent = circle
 
@@ -183,7 +189,7 @@ applyCleanStyle(main, 8)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyCleanStyle(titleBar, 8)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.5", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.6", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = DarkPanel, Text = "-", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 applyCleanStyle(minBtn, 4)
@@ -361,7 +367,6 @@ local function switchTab(tab)
     tabHome.Visible = tab == "home"
     tabBreak.Visible = tab == "break"
     tabSteal.Visible = tab == "steal"
-    
     btnHome.TextColor3 = tab == "home" and WhiteText or GreyText
     btnBreak.TextColor3 = tab == "break" and WhiteText or GreyText
     btnSteal.TextColor3 = tab == "steal" and WhiteText or GreyText
@@ -373,7 +378,7 @@ btnSteal.MouseButton1Click:Connect(function() switchTab("steal") end)
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 200 })
 applyCleanStyle(confirm, 8)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.5?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.6?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.fromOffset(14, 80), BackgroundColor3 = Color3.fromRGB(100, 30, 30), Text = "Ya", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 applyCleanStyle(yesBtn, 6)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.new(1, -114, 0, 80), BackgroundColor3 = DarkPanel, Text = "Batal", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
@@ -383,4 +388,9 @@ noBtn.MouseButton1Click:Connect(function() confirm.Visible = false end)
 yesBtn.MouseButton1Click:Connect(function() Running = false; gui:Destroy() end)
 closeBtn.MouseButton1Click:Connect(function() confirm.Visible = true end)
 
-switchTab("home") -- Buka Beranda pas start
+switchTab("home")
+
+-- Notif Sukses
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {Title = "AxD Hub", Text = "Script berhasil dimuat!", Duration = 3})
+end)
