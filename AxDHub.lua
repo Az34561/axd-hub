@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v5.5 | Real Pickup Verify, Anti Miss Target
+--  AxD Hub v5.6 | Smooth AlignPosition Fly & Real Pickup
 --══════════════════════════════════════════════════════════════
 
 local ScriptURL = "https://raw.githubusercontent.com/..." 
@@ -69,7 +69,6 @@ local function getSafeZone()
     return nil
 end
 
--- Parse Harga
 local function parseValue(str)
     if not str or str == "" then return 0 end
     str = string.lower(str)
@@ -83,88 +82,99 @@ local function parseValue(str)
     return num
 end
 
--- Fungsi Terbang Cepat
+-- Smooth Fly Pake AlignPosition
 local function flyTo(targetPos, isPickup)
     local hrp = getHRP()
     if not hrp then return end
+    local char = LP.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
     
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Parent = hrp
+    if hum then
+        hum.JumpPower = 0
+        hum.JumpHeight = 0
+        hum.Jump = false
+    end
     
-    local speed = 250
-    local reached = false
-    
-    local connection
-    connection = RunService.Heartbeat:Connect(function()
-        local currentHrp = getHRP()
-        if not currentHrp or not bv.Parent then
-            if connection then connection:Disconnect() end
-            return
-        end
-        
-        -- Kalau pickup, jaraknya dibikin lebih mepet (2 studs)
-        local stopDist = isPickup and 1.5 or 4
-        local dist = (targetPos - currentHrp.Position).Magnitude
-        
-        if dist > stopDist then
-            local direction = (targetPos - currentHrp.Position).Unit
-            bv.Velocity = direction * speed
-        else
-            bv.Velocity = Vector3.zero
-            reached = true
-            if connection then connection:Disconnect() end
-            bv:Destroy()
-        end
-    end)
+    local align = Instance.new("AlignPosition")
+    align.Mode = Enum.PositionAlignmentMode.OneAttachment
+    align.Attachment0 = hrp:FindFirstChild("RootAttachment") or hrp.RootAttachment
+    align.Position = targetPos
+    align.MaxForce = math.huge
+    align.Responsiveness = 50
+    align.Parent = hrp
     
     local t = tick()
-    while not reached and tick() - t < 2.0 do
-        task.wait(0.03)
+    while tick() - t < 2.0 do
+        local currHrp = getHRP()
+        if not currHrp then break end
+        if (currHrp.Position - targetPos).Magnitude < (isPickup and 2 or 4) then break end
+        RunService.Heartbeat:Wait()
     end
-    if bv and bv.Parent then bv:Destroy() end
-    if connection then connection:Disconnect() end
+    
+    if align then align:Destroy() end
+    if hum then
+        hum.JumpPower = 50
+        hum.JumpHeight = 7.2
+    end
+    if getHRP() then getHRP().AssemblyLinearVelocity = Vector3.zero end
 end
 
--- Fungsi Ambil Hewan (Verifikasi)
-local function attemptPickup(drop)
+-- Nyari Drop Hewan (Sabar nunggu sampe 1.5 detik)
+local function waitForDrop(eggPos)
+    local t = tick()
+    while tick() - t < 1.5 do
+        for _, obj in ipairs(Workspace:GetChildren()) do
+            if obj:IsA("Model") or obj:IsA("Tool") then
+                local modelPos = obj.PrimaryPart and obj.PrimaryPart.Position or (obj:IsA("BasePart") and obj.Position)
+                if modelPos and (modelPos - eggPos).Magnitude < 40 then
+                    if obj:FindFirstChildWhichIsA("ProximityPrompt", true) or obj:FindFirstChildWhichIsA("ClickDetector", true) or obj:IsA("Tool") then
+                        return obj
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+    return nil
+end
+
+-- Ambil Hewan (Verifikasi)
+local function pickupDrop(drop)
     local dp = drop:IsA("BasePart") and drop or drop:FindFirstChildWhichIsA("BasePart", true)
     if not dp then return false end
     
-    local hrp = getHRP()
-    if not hrp then return false end
-    
-    -- Terbang bener-bener ke hewan
     flyTo(dp.Position, true)
-    task.wait(0.1)
+    task.wait(0.2)
     
-    -- Paksa kalau itu Tool
-    if drop:IsA("Tool") and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
-        pcall(function() LP.Character:FindFirstChildOfClass("Humanoid"):EquipTool(drop) end)
-    end
-    
-    -- Tembak Prompt & Click
     for _, d in ipairs(drop:GetDescendants()) do
         if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
         if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
     end
-    pcall(function() firetouchinterest(hrp, dp, 0) end)
-    pcall(function() firetouchinterest(hrp, dp, 1) end)
     
-    -- Tunggu server proses (0.4 detik)
-    task.wait(0.4)
-    
-    -- Cek apakah hewan beneran masuk (atau hilang dari map)
-    local isPicked = false
-    if not drop.Parent then 
-        isPicked = true 
-    elseif LP.Backpack and LP.Backpack:FindFirstChild(drop.Name) then
-        isPicked = true
-    elseif LP.Character and LP.Character:FindFirstChild(drop.Name) then
-        isPicked = true
+    local hrp = getHRP()
+    if hrp then
+        for _, p in ipairs(drop:GetDescendants()) do
+            if p:IsA("BasePart") then
+                pcall(function() firetouchinterest(hrp, p, 0) end)
+                pcall(function() firetouchinterest(hrp, p, 1) end)
+            end
+        end
     end
     
-    return isPicked
+    if drop:IsA("Tool") and LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
+        pcall(function() LP.Character:FindFirstChildOfClass("Humanoid"):EquipTool(drop) end)
+    end
+    
+    -- Nunggu 0.5 detik buat mastiin hewan masuk tas
+    local t = tick()
+    while tick() - t < 0.5 do
+        if not drop.Parent then return true end
+        if LP.Backpack and LP.Backpack:FindFirstChild(drop.Name) then return true end
+        if LP.Character and LP.Character:FindFirstChild(drop.Name) then return true end
+        task.wait(0.1)
+    end
+    
+    return false
 end
 
 -- ═════════════ LOGIKA BREAK ═════════════
@@ -174,9 +184,6 @@ local function startBreakLoop()
             if AutoBreak and next(SelectedEggs) then
                 local hrp = getHRP()
                 if hrp then
-                    local humanoid = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
-                    if humanoid then humanoid.Jump = false end
-                    
                     if StatusLabel then StatusLabel.Text = "Status: Mencari Egg..." end
                     local targetEgg = nil
                     local targetName = nil
@@ -202,7 +209,7 @@ local function startBreakLoop()
                         if StatusLabel then StatusLabel.Text = "Status: Terbang ke " .. targetName end
                         flyTo(targetEgg.part.Position + Vector3.new(0, 0, -3), false)
                         
-                        -- Equip Pickaxe
+                        -- Equip Tool
                         local tool = LP.Character and LP.Character:FindFirstChildWhichIsA("Tool")
                         if not tool and LP.Backpack then
                             local pick = LP.Backpack:FindFirstChild("Pickaxe") or LP.Backpack:FindFirstChildWhichIsA("Tool")
@@ -216,86 +223,58 @@ local function startBreakLoop()
                         if StatusLabel then StatusLabel.Text = "Status: Auto Swinging!" end
                         local startTime = tick()
                         local isBroken = false
+                        local eggPos = targetEgg.part.Position
+                        
                         while tick() - startTime < 2.0 do
                             if not targetEgg.model or not targetEgg.model.Parent then 
                                 isBroken = true 
                                 break 
                             end
-                            if humanoid then humanoid.Jump = false end
                             if tool then pcall(function() tool:Activate() end) end
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 0) end)
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 1) end)
                             task.wait(0.02)
                         end
                         
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                        
-                        local hasTarget = false
+                        if getHRP() then getHRP().AssemblyLinearVelocity = Vector3.zero end
                         
                         if isBroken or not targetEgg.model.Parent then
-                            if StatusLabel then StatusLabel.Text = "Status: Cek Harga Pet..." end
-                            task.wait(0.3)
-                            
-                            local drop = nil
-                            for _, obj in ipairs(Workspace:GetDescendants()) do
-                                if obj:IsA("Tool") or (obj:IsA("Model") and (obj:FindFirstChildWhichIsA("ProximityPrompt", true) or obj:FindFirstChildWhichIsA("ClickDetector", true))) then
-                                    local dp = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart", true)
-                                    if dp and (dp.Position - targetEgg.part.Position).Magnitude < 30 then
-                                        drop = obj
-                                        break
-                                    end
-                                end
-                            end
+                            if StatusLabel then StatusLabel.Text = "Status: Cari Drop Pet..." end
+                            local drop = waitForDrop(eggPos)
                             
                             if drop then
-                                local petValue = 0
+                                local val = 0
                                 for _, v in ipairs(drop:GetDescendants()) do
                                     if v:IsA("NumberValue") or v:IsA("IntValue") or v:IsA("StringValue") then
-                                        if v.Name:lower():find("value") or v.Name:lower():find("income") or v.Name:lower():find("price") or v.Name:lower():find("per") then
-                                            petValue = parseValue(tostring(v.Value))
+                                        local name = v.Name:lower()
+                                        if name:find("value") or name:find("income") or name:find("price") or name:find("per") then
+                                            val = parseValue(tostring(v.Value))
                                         end
                                     end
                                 end
                                 
                                 local minVal = parseValue(MinValueInput.Text)
-                                if petValue >= minVal then
-                                    if StatusLabel then StatusLabel.Text = "Status: Harga Cocok! Mengambil..." end
-                                    
-                                    -- Coba ambil 3x kalau gagal
-                                    local success = false
-                                    for attempt = 1, 3 do
-                                        success = attemptPickup(drop)
-                                        if success then break end
-                                        task.wait(0.2)
-                                    end
-                                    
+                                if val >= minVal then
+                                    if StatusLabel then StatusLabel.Text = "Status: Harga Cocok, Ambil!" end
+                                    local success = pickupDrop(drop)
                                     if success then
-                                        hasTarget = true
-                                        if StatusLabel then StatusLabel.Text = "Status: Berhasil! Bawa ke Safe Zone" end
+                                        if StatusLabel then StatusLabel.Text = "Status: Berhasil! Ke Safe Zone" end
+                                        local safe = getSafeZone()
+                                        if safe then flyTo(safe.Position + Vector3.new(0,3,0), false) end
+                                        task.wait(0.3)
                                     else
-                                        if StatusLabel then StatusLabel.Text = "Status: Gagal pickup (Bug), Skip!" end
+                                        if StatusLabel then StatusLabel.Text = "Status: Gagal Ambil, Lanjut..." end
                                     end
                                 else
-                                    if StatusLabel then StatusLabel.Text = "Status: Harga Terlalu Murah, Skip!" end
+                                    if StatusLabel then StatusLabel.Text = "Status: Murah, Skip!" end
                                 end
-                            end
-                            
-                            -- BALIK KE SAFE ZONE HANYA KALO DAPET
-                            if hasTarget then
-                                local safe = getSafeZone()
-                                if safe then 
-                                    flyTo(safe.Position + Vector3.new(0, 3, 0), false)
-                                    task.wait(0.1)
-                                    hrp.AssemblyLinearVelocity = Vector3.zero
-                                end
-                                task.wait(0.3)
                             else
-                                task.wait(0.1) -- Langsung cari egg lain
+                                if StatusLabel then StatusLabel.Text = "Status: Ga Ada Drop, Lanjut..." end
                             end
                         else
                             if StatusLabel then StatusLabel.Text = "Status: Gagal pecah, skip..." end
-                            task.wait(0.2)
                         end
+                        task.wait(0.2)
                     else
                         task.wait(0.2)
                     end
@@ -319,24 +298,21 @@ local BtnBg = Color3.fromRGB(45, 45, 55)
 local WhiteText = Color3.fromRGB(255, 255, 255)
 local GreyText = Color3.fromRGB(180, 180, 180)
 
--- Tombol Bulat
 local circle = new("TextButton", { Parent = gui, Size = UDim2.fromOffset(50, 50), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = MainBg, Text = "AxD", TextColor3 = WhiteText, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 50 })
 applyStyle(circle, 25)
 
--- Main Panel
 local main = new("Frame", { Parent = gui, Size = UDim2.fromOffset(460, 360), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 10 })
 applyStyle(main, 8)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyStyle(titleBar, 8)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v5.5", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v5.6", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = BtnBg, Text = "-", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 applyStyle(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = BtnBg, Text = "X", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 applyStyle(closeBtn, 4)
 
--- Drag Tombol & Panel
 local draggingBtn, dragStartBtn, startPosBtn, movedBtn = false, nil, nil, 0
 circle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingBtn = true; dragStartBtn = input.Position; startPosBtn = circle.Position; movedBtn = 0 end
@@ -371,7 +347,6 @@ end)
 
 minBtn.MouseButton1Click:Connect(function() main.Visible = false; circle.Visible = true end)
 
--- Sidebar
 local navL = new("Frame", { Parent = main, Size = UDim2.fromOffset(90, 325), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11 })
 new("UIListLayout", { Parent = navL, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 
@@ -390,7 +365,6 @@ applyStyle(content, 6)
 
 StatusLabel = new("TextLabel", { Parent = main, Size = UDim2.new(1, -100, 0, 20), Position = UDim2.new(0, 90, 1, -30), BackgroundTransparency = 1, Text = "Status: Idle", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
--- TAB BERANDA
 local tabHome = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
 
 local profileImg = new("ImageLabel", { Parent = tabHome, Size = UDim2.fromOffset(80, 80), Position = UDim2.fromOffset(10, 10), BackgroundColor3 = MainBg, ZIndex = 13 })
@@ -416,7 +390,6 @@ btnReload.MouseButton1Click:Connect(function()
     end
 end)
 
--- TAB BREAK
 local tabBreak = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
 new("TextLabel", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 20), Position = UDim2.fromOffset(5, 5), BackgroundTransparency = 1, Text = "1. Pilih Zone", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
@@ -495,7 +468,6 @@ btnStart.MouseButton1Click:Connect(function()
     end
 end)
 
--- TAB STEAL
 local tabSteal = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
 new("TextLabel", { Parent = tabSteal, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "Fitur Steal menyusul.", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13 })
 
@@ -511,10 +483,9 @@ btnHome.MouseButton1Click:Connect(function() switchTab("home") end)
 btnBreak.MouseButton1Click:Connect(function() switchTab("break") end)
 btnSteal.MouseButton1Click:Connect(function() switchTab("steal") end)
 
--- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 200 })
 applyStyle(confirm, 8)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v5.5?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v5.6?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.fromOffset(14, 80), BackgroundColor3 = Color3.fromRGB(150, 40, 40), Text = "Ya", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 applyStyle(yesBtn, 6)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.new(1, -114, 0, 80), BackgroundColor3 = BtnBg, Text = "Batal", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
