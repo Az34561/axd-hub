@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v4.2 | Fixed TP, 1T Damage Hook, & Draggable UI
+--  AxD Hub v4.3 | Fix Stuck, Logo Update, & Fast Spam Break
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -56,7 +56,6 @@ local function getHRP()
     return c and c:FindFirstChild("HumanoidRootPart") or nil
 end
 
--- Paksa Safe Zone
 local function getSafeZone()
     if SafeZonePart and SafeZonePart.Parent then return SafeZonePart end
     for _, o in ipairs(Workspace:GetDescendants()) do
@@ -72,26 +71,7 @@ local function getSafeZone()
     return nil
 end
 
--- ═════════════ DAMAGE HOOK (BIAR 1T) ═════════════
--- Hook ini nangkep sinyal damage ke server dan maksa angkanya jadi 1 Triliun
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    
-    if not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
-        for i, v in pairs(args) do
-            if type(v) == "number" and v > 0 and v < 1000000 then
-                -- Kalau angkanya mirip damage (misal 1-10000), timpa jadi 1T
-                args[i] = 1000000000000
-            end
-        end
-    end
-    
-    return oldNamecall(self, unpack(args))
-end)
-
--- ═════════════ LOGIKA BREAK ═════════════
+-- ═════════════ LOGIKA BREAK (TANPA HOOK, AMAN) ═════════════
 local function startBreakLoop()
     task.spawn(function()
         while Running do
@@ -103,13 +83,13 @@ local function startBreakLoop()
                     local targetEgg = nil
                     for eggName, active in pairs(SelectedEggs) do
                         if active then
-                            -- Nyari model dengan nama yang PERSIS SAMA
                             for _, obj in ipairs(Workspace:GetDescendants()) do
+                                -- Cari model yang namanya PERSIS SAMA (Case Insensitive)
                                 if obj:IsA("Model") and string.lower(obj.Name) == string.lower(eggName) then
                                     local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
                                     local safe = getSafeZone()
-                                    -- Jarak > 50 studs berarti di luar base
-                                    if part and (not safe or (part.Position - safe.Position).Magnitude > 50) then
+                                    -- Filter jarak biar gak ambil yang di dalem base
+                                    if part and (not safe or (part.Position - safe.Position).Magnitude > 80) then
                                         targetEgg = {model = obj, part = part}
                                         break
                                     end
@@ -142,8 +122,8 @@ local function startBreakLoop()
                             end
                         end
                         
-                        -- Spam Klik & Touch (Damage udh di-hook jadi 1T)
-                        for i = 1, 20 do
+                        -- Spam Klik Cepat (Fast Spam)
+                        for i = 1, 30 do
                             if not targetEgg.model.Parent then break end
                             if tool then pcall(function() tool:Activate() end) end
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 0) end)
@@ -160,13 +140,13 @@ local function startBreakLoop()
                         task.wait(0.1)
                         if StatusLabel then StatusLabel.Text = "Status: Balik ke Safe Zone" end
                         
-                        -- Kabur ke Safe Zone
+                        -- Balik ke Base
                         local safe = getSafeZone()
                         if safe then 
                             hrp.CFrame = safe.CFrame + Vector3.new(0, 5, 0) 
                             hrp.AssemblyLinearVelocity = Vector3.zero
                         end
-                        task.wait(0.2)
+                        task.wait(0.3)
                     else
                         task.wait(0.5)
                     end
@@ -189,9 +169,22 @@ local DarkPanel = Color3.fromRGB(25, 25, 25)
 local WhiteText = Color3.fromRGB(255, 255, 255)
 local GreyText = Color3.fromRGB(150, 150, 150)
 
--- FLOATING BUTTON
-local circle = new("TextButton", { Parent = gui, Size = UDim2.fromOffset(50, 50), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = MainBg, Text = "AxD", TextColor3 = WhiteText, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 50 })
-applyCleanStyle(circle, 25)
+-- FLOATING BUTTON PAKAI LOGO BARU
+local circle = new("TextButton", { 
+    Parent = gui, 
+    Size = UDim2.fromOffset(50, 50), 
+    Position = UDim2.fromScale(0.5, 0.5), 
+    AnchorPoint = Vector2.new(0.5, 0.5), 
+    BackgroundColor3 = MainBg, 
+    BackgroundTransparency = 1, -- Biar gambar keliatan
+    Text = "", -- Hapus teks AxD
+    Image = "rbxassetid://135210246009589", -- LOGO BARU LU
+    ImageColor3 = Color3.fromRGB(255, 255, 255),
+    ScaleType = Enum.ScaleType.Crop, -- Biar gambar penuh
+    ZIndex = 50 
+})
+local cornerBtn = Instance.new("UICorner"); cornerBtn.CornerRadius = UDim.new(1, 0); cornerBtn.Parent = circle
+local strokeBtn = Instance.new("UIStroke"); strokeBtn.Color = Color3.fromRGB(255,255,255); strokeBtn.Thickness = 1.5; strokeBtn.Transparency = 0.5; strokeBtn.Parent = circle
 
 -- Main Window
 local main = new("Frame", { Parent = gui, Size = UDim2.fromOffset(450, 350), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 10 })
@@ -199,15 +192,15 @@ applyCleanStyle(main, 8)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyCleanStyle(titleBar, 8)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.2", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.3", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = DarkPanel, Text = "-", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 applyCleanStyle(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = DarkPanel, Text = "X", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 applyCleanStyle(closeBtn, 4)
 
--- Logic Drag buat tombol AxD (FIX)
-local draggingBtn, dragStartBtn, startPosBtn, movedBtn
+-- Logic Drag Tombol AxD
+local draggingBtn, dragStartBtn, startPosBtn, movedBtn = false, nil, nil, 0
 circle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         draggingBtn = true
@@ -226,14 +219,14 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
         draggingBtn = false
-        if movedBtn < 5 then -- Kalau cuma di-tap
+        if movedBtn < 5 then
             main.Visible = true
             circle.Visible = false
         end
     end
 end)
 
--- Logic Drag buat Panel (FIX)
+-- Logic Drag Panel
 local draggingPanel, dragStartPanel, startPosPanel
 titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -360,7 +353,7 @@ btnSteal.MouseButton1Click:Connect(function() switchTab("steal") end)
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 200 })
 applyCleanStyle(confirm, 8)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.2?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.3?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.fromOffset(14, 80), BackgroundColor3 = Color3.fromRGB(100, 30, 30), Text = "Ya", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 applyCleanStyle(yesBtn, 6)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.new(1, -114, 0, 80), BackgroundColor3 = DarkPanel, Text = "Batal", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
