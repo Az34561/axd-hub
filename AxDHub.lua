@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v2.3 | Optimized, No Lag, Godmode Halloween, Zero Delay
+--  AxD Hub v2.4 | Smart Grab (ClickDetector Support & Status UI)
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -20,14 +20,13 @@ if not parentGui then parentGui = PG end
 
 if parentGui:FindFirstChild("AxDHubV1") then parentGui.AxDHubV1:Destroy() end
 
--- ⚡ PERINGATAN GRAFIK SAAT EXECUTE
+-- ⚡ TURUNIN GRAFIK
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "AxD Hub v2.3",
-        Text = "Mengoptimalkan grafik & mematikan efek berat agar tidak ngeleg...",
+        Title = "AxD Hub v2.4",
+        Text = "Grafik dioptimalkan. Auto Steal Smart Mode Aktif.",
         Duration = 5
     })
-    -- Otomatis turunin kualitas grafis
     Lighting.GlobalShadows = false
     Lighting.FogEnd = 100
     settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
@@ -124,7 +123,7 @@ local function getHRP()
     return c and c:FindFirstChild("HumanoidRootPart") or nil
 end
 
--- Paksa Anti Hit (Godmode Instan)
+-- Godmode Instan
 local function setupGodmode(char)
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if hum then
@@ -133,18 +132,11 @@ local function setupGodmode(char)
                 if hum.Health < hum.MaxHealth then hum.Health = hum.MaxHealth end
             end
         end)
-        local forceGod = RunService.Heartbeat:Connect(function()
-            if (AutoSteal or Running) and hum.Health < hum.MaxHealth then
-                hum.Health = hum.MaxHealth
-            end
-        end)
     end
 end
-
 LP.CharacterAdded:Connect(setupGodmode)
 if LP.Character then setupGodmode(LP.Character) end
 
--- Cari Safe Zone (Hanya 1x agar tidak lag)
 local function getSafeZone()
     if SafeZonePart and SafeZonePart.Parent then return SafeZonePart end
     for _, o in ipairs(Workspace:GetDescendants()) do
@@ -160,24 +152,28 @@ local function getSafeZone()
     return nil
 end
 
--- Cari Egg di Wild (Anti Lag: pakai FindFirstChild rekursif, bukan GetDescendants)
+-- SMART EGG FINDER (Pake match, bukan exact name)
 local function findWildEgg(name)
     local safe = getSafeZone()
-    -- Cari model yang namanya mengandung nama egg
-    local eggModel = Workspace:FindFirstChild(name, true)
-    if eggModel and eggModel:IsA("Model") then
-        local p = eggModel.PrimaryPart or eggModel:FindFirstChildWhichIsA("BasePart", true)
-        if p then
-            if safe and (p.Position - safe.Position).Magnitude < 80 then
-                return nil -- Skip jika di dalam base
+    for _, o in ipairs(Workspace:GetDescendants()) do
+        if (o:IsA("Model") or o:IsA("BasePart")) and string.find(string.lower(o.Name), string.lower(name)) then
+            local p = o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart", true) or (o:IsA("BasePart") and o)
+            if p then
+                -- Jarak aman dari base cuma 40 studs (biar egg yg agak jauhan tetep keambil)
+                if safe and (p.Position - safe.Position).Magnitude < 40 then
+                    -- Skip base
+                else
+                    return { model = o, part = p }
+                end
             end
-            return { model = eggModel, part = p }
         end
     end
     return nil
 end
 
---═════════════ STEAL LOGIC (ZERO DELAY) ═════════════
+--═════════════ STEAL LOGIC ═════════════
+local StatusLabel -- Dideklarasi dulu buat update status
+
 local function startStealLoop()
     task.spawn(function()
         while Running do
@@ -185,6 +181,8 @@ local function startStealLoop()
                 local hrp = getHRP()
                 if hrp then
                     local target = nil
+                    if StatusLabel then StatusLabel.Text = "Status: Mencari Egg..." end
+                    
                     for name, active in pairs(SelectedEggs) do
                         if active then
                             target = findWildEgg(name)
@@ -193,13 +191,22 @@ local function startStealLoop()
                     end
                     
                     if target then
-                        -- 1. Teleport ke Egg (Langsung tanpa delay)
-                        hrp.CFrame = target.part.CFrame + Vector3.new(0, 3, 0)
+                        if StatusLabel then StatusLabel.Text = "Status: Nyamber Egg!" end
                         
-                        -- 2. Ambil (Prompt & Touch)
+                        -- Teleport + Reset Velocity
+                        hrp.CFrame = target.part.CFrame + Vector3.new(0, 3, 0)
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        hrp.AssemblyAngularVelocity = Vector3.zero
+                        
+                        task.wait(0.05)
+                        
+                        -- Ambil Prompt & ClickDetector
                         for _, d in ipairs(target.model:GetDescendants()) do
                             if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
+                            if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
                         end
+                        
+                        -- Touch Interest
                         for _, p in ipairs(target.model:GetDescendants()) do
                             if p:IsA("BasePart") then
                                 pcall(function() firetouchinterest(hrp, p, 0) end)
@@ -207,16 +214,22 @@ local function startStealLoop()
                             end
                         end
                         
-                        -- 3. LANGSUNG KABUR (0.05 detik biar server sempet deteksi grab)
                         task.wait(0.05)
-                        local safe = getSafeZone()
-                        if safe then hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) end
+                        if StatusLabel then StatusLabel.Text = "Status: Kabur ke Safe Zone!" end
                         
+                        local safe = getSafeZone()
+                        if safe then 
+                            hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) 
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                        end
+                        
+                        task.wait(0.1)
                     else
-                        task.wait(0.5) -- Egg ga ada, tunggu
+                        task.wait(0.4) -- Tunggu 0.4 detik biar ga ngeleg
                     end
                 end
             else
+                if StatusLabel then StatusLabel.Text = "Status: Idle (Pilih Egg & Nyalakan)" end
                 task.wait(0.5)
             end
             task.wait(0.05)
@@ -225,10 +238,10 @@ local function startStealLoop()
 end
 startStealLoop()
 
--- Anti Guard (Pindah ke task.spawn biar ga nge-lag UI)
+-- Anti Guard
 task.spawn(function()
     while Running do
-        if not AutoSteal then
+        if AutoSteal then
             for _, m in ipairs(Workspace:GetDescendants()) do
                 if m:IsA("Model") and m ~= LP.Character then
                     local hum = m:FindFirstChildOfClass("Humanoid")
@@ -238,7 +251,7 @@ task.spawn(function()
                 end
             end
         end
-        task.wait(1) -- Cek 1 detik sekali aja biar ga ngeleg
+        task.wait(1)
     end
 end)
 
@@ -283,19 +296,19 @@ end)
 circle.MouseButton1Click:Connect(function() if movedBtn < 5 then openPanel() end end)
 
 -- Main Panel
-main = new("Frame", { Parent = gui, Size = UDim2.fromOffset(450, 320), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = DarkBG, Visible = false, ZIndex = 10 })
+main = new("Frame", { Parent = gui, Size = UDim2.fromOffset(450, 340), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = DarkBG, Visible = false, ZIndex = 10 })
 corner(main, 6); stroke(main, Color3.fromRGB(0,0,0), 2)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = RedTheme, ZIndex = 11 })
 corner(titleBar, 6)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v2.3", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v2.4", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 12 })
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = Color3.fromRGB(50, 50, 50), Text = "-", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 16, ZIndex = 12 })
 corner(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = Color3.fromRGB(0,0,0), Text = "X", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 14, ZIndex = 12 })
 corner(closeBtn, 4)
 drag(main, titleBar)
 
-local navL = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 285), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11 })
+local navL = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 305), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11 })
 new("UIListLayout", { Parent = navL, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 local function createNavBtn(txt, parent)
     local b = new("TextButton", { Parent = parent, Size = UDim2.fromOffset(100, 35), BackgroundColor3 = RedTheme, Text = txt, TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, AutoButtonColor = false })
@@ -304,13 +317,16 @@ end
 local btnStealTab = createNavBtn("Steal", navL)
 local btnGuardTab = createNavBtn("Guard", navL)
 
-local navR = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 285), Position = UDim2.new(1, -100, 0, 35), BackgroundTransparency = 1, ZIndex = 11 })
+local navR = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 305), Position = UDim2.new(1, -100, 0, 35), BackgroundTransparency = 1, ZIndex = 11 })
 new("UIListLayout", { Parent = navR, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 local btnDiscord = createNavBtn("Discord", navR)
 local btnConfig = createNavBtn("Config", navR)
 
-local content = new("Frame", { Parent = main, Size = UDim2.new(1, -200, 1, -35), Position = UDim2.fromOffset(100, 35), BackgroundColor3 = PanelBG, ZIndex = 11 })
+local content = new("Frame", { Parent = main, Size = UDim2.new(1, -200, 1, -60), Position = UDim2.fromOffset(100, 35), BackgroundColor3 = PanelBG, ZIndex = 11 })
 corner(content, 4)
+
+-- Status Text (Biar lu tau script lagi ngapain)
+StatusLabel = new("TextLabel", { Parent = main, Size = UDim2.new(1, -200, 0, 20), Position = UDim2.new(0, 100, 1, -25), BackgroundTransparency = 1, Text = "Status: Idle", TextColor3 = Color3.fromRGB(200, 200, 200), Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
 -- TAB STEAL
 local tabSteal = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
@@ -455,7 +471,7 @@ minBtn.MouseButton1Click:Connect(function() main.Visible = false; circle.Visible
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 150), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(15, 12, 20), Visible = false, ZIndex = 200 })
 corner(confirm, 12); stroke(confirm, Color3.fromRGB(180, 50, 70), 1.5)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v2.3?", TextColor3 = Color3.fromRGB(255, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v2.4?", TextColor3 = Color3.fromRGB(255, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.fromOffset(14, 100), BackgroundColor3 = Color3.fromRGB(120, 30, 45), Text = "Ya, Hapus", TextColor3 = Color3.fromRGB(255, 240, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 corner(yesBtn, 8)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.new(1, -124, 0, 100), BackgroundColor3 = Color3.fromRGB(35, 35, 50), Text = "Batal", TextColor3 = Color3.fromRGB(220, 220, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
