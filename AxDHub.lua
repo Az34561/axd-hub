@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v1.2 | Chilli Style | Steal & Guard | Fix Center Button
+--  AxD Hub v1.3 | Chilli Style | Fix Button & Panel Center
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -46,7 +46,6 @@ local function stroke(o, color, thick)
     s.Parent = o
 end
 
--- Drag function buat Panel
 local function drag(frame, handle)
     local dragging, dragStart, startPos
     handle.InputBegan:Connect(function(input)
@@ -208,18 +207,25 @@ RunService.Heartbeat:Connect(function()
 end)
 
 --═════════════ UI CREATION ═════════════
-local gui = new("ScreenGui", { Name = "AxDHubV1", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, PG)
+local gui = new("ScreenGui", { 
+    Name = "AxDHubV1", 
+    ResetOnSpawn = false, 
+    IgnoreGuiInset = true, 
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    DisplayOrder = 999 -- FIX: Biar selalu di paling atas
+}, PG)
 
 local RedTheme = Color3.fromRGB(190, 40, 40)
 local DarkBG = Color3.fromRGB(20, 20, 20)
 local PanelBG = Color3.fromRGB(30, 30, 30)
 local TextColor = Color3.fromRGB(255, 255, 255)
 
--- ⚡ FIX TOMBOL BULAT: Mulai di tengah layar & bisa di-drag
+-- ⚡ TOMBOL BULAT (FIX TENGAH & DRAG)
 local circle = new("TextButton", {
     Parent = gui, 
     Size = UDim2.fromOffset(50, 50), 
-    Position = UDim2.new(0.5, -25, 0.5, -25), -- Posisi awal pas di tengah layar
+    AnchorPoint = Vector2.new(0.5, 0.5), -- Biar center beneran
+    Position = UDim2.fromScale(0.5, 0.5), -- Mulai di tengah layar
     BackgroundColor3 = RedTheme, 
     Text = "AxD", 
     TextColor3 = TextColor, 
@@ -232,7 +238,6 @@ local circle = new("TextButton", {
 corner(circle, 25)
 stroke(circle, Color3.fromRGB(0,0,0), 2)
 
--- Logic Drag & Tap buat Tombol Bulat
 local draggingBtn, dragStartBtn, startPosBtn, movedBtn = false, nil, nil, 0
 circle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -245,25 +250,30 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStartBtn
-        movedBtn = movedBtn + delta.Magnitude
+        movedBtn = movedBtn + math.abs(delta.X) + math.abs(delta.Y)
         circle.Position = UDim2.new(startPosBtn.X.Scale, startPosBtn.X.Offset + delta.X, startPosBtn.Y.Scale, startPosBtn.Y.Offset + delta.Y)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
     if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
         draggingBtn = false
-        if movedBtn < 5 then -- Kalau geserannya dikit, anggap nge-klik (buka panel)
+        if movedBtn < 10 then -- Kalau gerakan dikit, anggap ngeklik
             circle.Visible = false
             main.Visible = true
-            renderEggs()
+            task.spawn(function() pcall(renderEggs) end)
         end
     end
 end)
 
--- Main Panel
+-- Main Panel (FIX TENGAH)
 local main = new("Frame", {
-    Parent = gui, Size = UDim2.fromOffset(500, 320), Position = UDim2.new(0.5, -250, 0.5, -160),
-    BackgroundColor3 = DarkBG, Visible = false, ZIndex = 10
+    Parent = gui, 
+    Size = UDim2.fromOffset(450, 300), 
+    AnchorPoint = Vector2.new(0.5, 0.5),
+    Position = UDim2.fromScale(0.5, 0.5), -- Selalu di tengah layar
+    BackgroundColor3 = DarkBG, 
+    Visible = false, 
+    ZIndex = 10
 })
 corner(main, 6)
 stroke(main, Color3.fromRGB(0,0,0), 2)
@@ -278,20 +288,30 @@ new("TextLabel", {
     Text = "AxD Hub v1", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18,
     ZIndex = 12
 })
+
+-- Tombol Minimize (-)
+local minBtn = new("TextButton", {
+    Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2),
+    BackgroundColor3 = Color3.fromRGB(50, 50, 50), Text = "-", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 16, ZIndex = 12
+})
+corner(minBtn, 4)
+
+-- Tombol Close (X)
 local closeBtn = new("TextButton", {
     Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2),
     BackgroundColor3 = Color3.fromRGB(0,0,0), Text = "X", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 14, ZIndex = 12
 })
 corner(closeBtn, 4)
+
 drag(main, titleBar)
 
 -- Side Nav (Kiri)
 local navL = new("Frame", {
-    Parent = main, Size = UDim2.fromOffset(100, 285), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11
+    Parent = main, Size = UDim2.fromOffset(100, 265), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11
 })
 local navLayout = new("UIListLayout", { Parent = navL, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 
-local function createNavBtn(txt, pos, parent)
+local function createNavBtn(txt, parent)
     local b = new("TextButton", {
         Parent = parent, Size = UDim2.fromOffset(100, 35), BackgroundColor3 = RedTheme,
         Text = txt, TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, AutoButtonColor = false
@@ -301,17 +321,17 @@ local function createNavBtn(txt, pos, parent)
     return b
 end
 
-local btnStealTab = createNavBtn("Steal", nil, navL)
-local btnGuardTab = createNavBtn("Guard", nil, navL)
+local btnStealTab = createNavBtn("Steal", navL)
+local btnGuardTab = createNavBtn("Guard", navL)
 
 -- Side Nav (Kanan)
 local navR = new("Frame", {
-    Parent = main, Size = UDim2.fromOffset(100, 285), Position = UDim2.new(1, -100, 0, 35), BackgroundTransparency = 1, ZIndex = 11
+    Parent = main, Size = UDim2.fromOffset(100, 265), Position = UDim2.new(1, -100, 0, 35), BackgroundTransparency = 1, ZIndex = 11
 })
 local navRLayout = new("UIListLayout", { Parent = navR, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 
-local btnDiscord = createNavBtn("Discord", nil, navR)
-local btnConfig = createNavBtn("Config", nil, navR)
+local btnDiscord = createNavBtn("Discord", navR)
+local btnConfig = createNavBtn("Config", navR)
 
 -- Content Area (Tengah)
 local content = new("Frame", {
@@ -360,7 +380,7 @@ toggleStealBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Render Eggs
-local function renderEggs()
+function renderEggs()
     for _, c in ipairs(stealScroll:GetChildren()) do
         if c:IsA("Frame") or c:IsA("TextButton") then c:Destroy() end
     end
@@ -403,7 +423,7 @@ end)
 local scanBtn = new("TextButton", { Parent = tabSteal, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -35), BackgroundColor3 = RedTheme, Text = "Scan Eggs", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 corner(scanBtn, 4)
 stroke(scanBtn, Color3.fromRGB(0,0,0), 1.5)
-scanBtn.MouseButton1Click:Connect(renderEggs)
+scanBtn.MouseButton1Click:Connect(function() task.spawn(function() pcall(renderEggs) end) end)
 
 --═════════════ TAB: GUARD ═════════════
 local tabGuard = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
@@ -453,7 +473,7 @@ guardBtn.MouseButton1Click:Connect(function()
     end
 end)
 
---═════════════ TAB SWITCH & CLOSE ═════════════
+--═════════════ TAB SWITCH ═════════════
 local function showTab(tab)
     tabSteal.Visible = tab == "steal"
     tabGuard.Visible = tab == "guard"
@@ -462,10 +482,47 @@ end
 btnStealTab.MouseButton1Click:Connect(function() showTab("steal") end)
 btnGuardTab.MouseButton1Click:Connect(function() showTab("guard") end)
 
-closeBtn.MouseButton1Click:Connect(function()
+--═════════════ PANEL CLOSE / MINIMIZE ═════════════
+minBtn.MouseButton1Click:Connect(function()
     main.Visible = false
     circle.Visible = true
 end)
 
+-- Konfirmasi Hapus
+local confirm = new("Frame", {
+    Parent = gui, Size = UDim2.fromOffset(260, 150), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+    BackgroundColor3 = Color3.fromRGB(15, 12, 20), Visible = false, ZIndex = 200
+})
+corner(confirm, 12)
+stroke(confirm, Color3.fromRGB(180, 50, 70), 1.5)
+
+new("TextLabel", {
+    Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14),
+    BackgroundTransparency = 1, Text = "Hapus AxD Hub v1?\nScript bakal berhenti total & hilang.",
+    TextColor3 = Color3.fromRGB(255, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextWrapped = true, ZIndex = 201
+})
+
+local yesBtn = new("TextButton", {
+    Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.fromOffset(14, 100),
+    BackgroundColor3 = Color3.fromRGB(120, 30, 45), Text = "Ya, Hapus",
+    TextColor3 = Color3.fromRGB(255, 240, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201
+})
+corner(yesBtn, 8)
+
+local noBtn = new("TextButton", {
+    Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.new(1, -124, 0, 100),
+    BackgroundColor3 = Color3.fromRGB(35, 35, 50), Text = "Batal",
+    TextColor3 = Color3.fromRGB(220, 220, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201
+})
+corner(noBtn, 8)
+
+noBtn.MouseButton1Click:Connect(function() confirm.Visible = false end)
+yesBtn.MouseButton1Click:Connect(function()
+    Running = false
+    gui:Destroy()
+end)
+
+closeBtn.MouseButton1Click:Connect(function() confirm.Visible = true end)
+
 task.wait(1)
-renderEggs()
+task.spawn(function() pcall(renderEggs) end)
