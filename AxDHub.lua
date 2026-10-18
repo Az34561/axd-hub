@@ -2,7 +2,7 @@
 --  AxD Hub v5.3 | Fly Mode, Auto Swing, & Min Value Filter
 --══════════════════════════════════════════════════════════════
 
-local ScriptURL = "https://raw.githubusercontent.com/..." 
+local ScriptURL = "https://raw.githubusercontent.com/Az34561/axd-hub/refs/heads/main/AxDHub.lua" 
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
