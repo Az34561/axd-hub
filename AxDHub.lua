@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v4.3 | Fix Stuck, Logo Update, & Fast Spam Break
+--  AxD Hub v4.5 | Final Fix: Home Tab, Logo, & Lightning Break
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -15,6 +15,9 @@ local parentGui
 pcall(function() parentGui = gethui and gethui() or game:GetService("CoreGui") end)
 if not parentGui then parentGui = PG end
 if parentGui:FindFirstChild("AxDHubV1") then parentGui.AxDHubV1:Destroy() end
+
+-- MASUKIN LINK GITHUB LU DI SINI BUAT FITUR RELOAD --
+local ScriptURL = "https://raw.githubusercontent.com/..." 
 
 -- ═════════════ DATA ZONES & EGGS ═════════════
 local ZoneData = {
@@ -71,7 +74,7 @@ local function getSafeZone()
     return nil
 end
 
--- ═════════════ LOGIKA BREAK (TANPA HOOK, AMAN) ═════════════
+-- ═════════════ LOGIKA BREAK (MUKUL KILAT) ═════════════
 local function startBreakLoop()
     task.spawn(function()
         while Running do
@@ -79,16 +82,15 @@ local function startBreakLoop()
                 local hrp = getHRP()
                 if hrp then
                     if StatusLabel then StatusLabel.Text = "Status: Mencari Egg..." end
-                    
                     local targetEgg = nil
+                    
                     for eggName, active in pairs(SelectedEggs) do
                         if active then
                             for _, obj in ipairs(Workspace:GetDescendants()) do
-                                -- Cari model yang namanya PERSIS SAMA (Case Insensitive)
-                                if obj:IsA("Model") and string.lower(obj.Name) == string.lower(eggName) then
-                                    local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+                                -- Nyari nama Part atau Model yang ada kata egg-nya
+                                if (obj:IsA("Model") or obj:IsA("BasePart")) and string.find(string.lower(obj.Name), string.lower(eggName)) then
+                                    local part = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true))
                                     local safe = getSafeZone()
-                                    -- Filter jarak biar gak ambil yang di dalem base
                                     if part and (not safe or (part.Position - safe.Position).Magnitude > 80) then
                                         targetEgg = {model = obj, part = part}
                                         break
@@ -100,59 +102,48 @@ local function startBreakLoop()
                     end
                     
                     if targetEgg then
-                        if StatusLabel then StatusLabel.Text = "Status: Breaking " .. targetEgg.model.Name end
+                        if StatusLabel then StatusLabel.Text = "Status: Lightning Break!" end
                         
                         -- Teleport ke atas telur
-                        hrp.CFrame = targetEgg.part.CFrame + Vector3.new(0, 5, 0)
+                        hrp.CFrame = targetEgg.part.CFrame + Vector3.new(0, 3, 0)
                         hrp.AssemblyLinearVelocity = Vector3.zero
-                        hrp.AssemblyAngularVelocity = Vector3.zero
-                        task.wait(0.1)
+                        task.wait(0.05)
                         
-                        -- Equip Pickaxe
-                        local char = LP.Character
-                        local tool = nil
-                        if char then
-                            tool = char:FindFirstChildWhichIsA("Tool")
-                            if not tool then
-                                local bp = LP:FindFirstChild("Backpack")
-                                if bp then
-                                    local pick = bp:FindFirstChild("Pickaxe") or bp:FindFirstChildWhichIsA("Tool")
-                                    if pick then char.Humanoid:EquipTool(pick); tool = pick end
-                                end
-                            end
+                        -- Equip Tool
+                        local tool = LP.Character and LP.Character:FindFirstChildWhichIsA("Tool")
+                        if not tool and LP.Backpack then
+                            local pick = LP.Backpack:FindFirstChild("Pickaxe") or LP.Backpack:FindFirstChildWhichIsA("Tool")
+                            if pick then LP.Character.Humanoid:EquipTool(pick); tool = pick end
                         end
                         
-                        -- Spam Klik Cepat (Fast Spam)
-                        for i = 1, 30 do
-                            if not targetEgg.model.Parent then break end
+                        -- Mukul Secepat Kilat (Spam 1 detik)
+                        local hitTime = tick()
+                        while tick() - hitTime < 1.0 and targetEgg.model.Parent do
                             if tool then pcall(function() tool:Activate() end) end
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 0) end)
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 1) end)
-                            task.wait(0.02)
+                            RunService.RenderStepped:Wait() -- Nunggu frame berikutnya (super cepat)
                         end
                         
-                        -- Ambil Pet / Prompt
+                        -- Ambil prompt
                         for _, d in ipairs(targetEgg.model:GetDescendants()) do
                             if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
                             if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
                         end
                         
-                        task.wait(0.1)
-                        if StatusLabel then StatusLabel.Text = "Status: Balik ke Safe Zone" end
-                        
-                        -- Balik ke Base
+                        if StatusLabel then StatusLabel.Text = "Status: Kabur ke Safe Zone" end
                         local safe = getSafeZone()
                         if safe then 
-                            hrp.CFrame = safe.CFrame + Vector3.new(0, 5, 0) 
+                            hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) 
                             hrp.AssemblyLinearVelocity = Vector3.zero
                         end
-                        task.wait(0.3)
+                        task.wait(0.2)
                     else
-                        task.wait(0.5)
+                        task.wait(0.3)
                     end
                 end
             else
-                if StatusLabel then StatusLabel.Text = "Status: Idle" end
+                if StatusLabel then StatusLabel.Text = "Status: Idle (Pilih Egg & Start)" end
                 task.wait(0.5)
             end
             task.wait(0.05)
@@ -169,22 +160,22 @@ local DarkPanel = Color3.fromRGB(25, 25, 25)
 local WhiteText = Color3.fromRGB(255, 255, 255)
 local GreyText = Color3.fromRGB(150, 150, 150)
 
--- FLOATING BUTTON PAKAI LOGO BARU
+-- ═════════════ TOMBOL BULAT (LOGO LU) ═════════════
 local circle = new("TextButton", { 
     Parent = gui, 
-    Size = UDim2.fromOffset(50, 50), 
+    Size = UDim2.fromOffset(60, 60), -- Ukuran disesuaikan biar logo jelas
     Position = UDim2.fromScale(0.5, 0.5), 
     AnchorPoint = Vector2.new(0.5, 0.5), 
     BackgroundColor3 = MainBg, 
-    BackgroundTransparency = 1, -- Biar gambar keliatan
-    Text = "", -- Hapus teks AxD
-    Image = "rbxassetid://135210246009589", -- LOGO BARU LU
+    BackgroundTransparency = 1, 
+    Text = "", -- HAPUS TEKS AXD
+    Image = "rbxassetid://135210246009589", -- LOGO LU
     ImageColor3 = Color3.fromRGB(255, 255, 255),
-    ScaleType = Enum.ScaleType.Crop, -- Biar gambar penuh
+    ScaleType = Enum.ScaleType.Crop,
     ZIndex = 50 
 })
 local cornerBtn = Instance.new("UICorner"); cornerBtn.CornerRadius = UDim.new(1, 0); cornerBtn.Parent = circle
-local strokeBtn = Instance.new("UIStroke"); strokeBtn.Color = Color3.fromRGB(255,255,255); strokeBtn.Thickness = 1.5; strokeBtn.Transparency = 0.5; strokeBtn.Parent = circle
+local strokeBtn = Instance.new("UIStroke"); strokeBtn.Color = Color3.fromRGB(255,255,255); strokeBtn.Thickness = 2; strokeBtn.Transparency = 0.4; strokeBtn.Parent = circle
 
 -- Main Window
 local main = new("Frame", { Parent = gui, Size = UDim2.fromOffset(450, 350), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 10 })
@@ -192,21 +183,18 @@ applyCleanStyle(main, 8)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyCleanStyle(titleBar, 8)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.3", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.5", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = DarkPanel, Text = "-", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 applyCleanStyle(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = DarkPanel, Text = "X", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 applyCleanStyle(closeBtn, 4)
 
--- Logic Drag Tombol AxD
+-- Logic Drag Tombol
 local draggingBtn, dragStartBtn, startPosBtn, movedBtn = false, nil, nil, 0
 circle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingBtn = true
-        dragStartBtn = input.Position
-        startPosBtn = circle.Position
-        movedBtn = 0
+        draggingBtn = true; dragStartBtn = input.Position; startPosBtn = circle.Position; movedBtn = 0
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
@@ -219,10 +207,7 @@ end)
 UserInputService.InputEnded:Connect(function(input)
     if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
         draggingBtn = false
-        if movedBtn < 5 then
-            main.Visible = true
-            circle.Visible = false
-        end
+        if movedBtn < 5 then main.Visible = true; circle.Visible = false end
     end
 end)
 
@@ -230,9 +215,7 @@ end)
 local draggingPanel, dragStartPanel, startPosPanel
 titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingPanel = true
-        dragStartPanel = input.Position
-        startPosPanel = main.Position
+        draggingPanel = true; dragStartPanel = input.Position; startPosPanel = main.Position
     end
 end)
 UserInputService.InputChanged:Connect(function(input)
@@ -242,9 +225,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-        draggingPanel = false
-    end
+    if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then draggingPanel = false end
 end)
 
 minBtn.MouseButton1Click:Connect(function() main.Visible = false; circle.Visible = true end)
@@ -259,6 +240,7 @@ local function createNavBtn(txt)
     return b
 end
 
+local btnHome = createNavBtn("Beranda")
 local btnBreak = createNavBtn("Break")
 local btnSteal = createNavBtn("Steal")
 
@@ -267,9 +249,43 @@ applyCleanStyle(content, 6)
 
 StatusLabel = new("TextLabel", { Parent = main, Size = UDim2.new(1, -100, 0, 20), Position = UDim2.new(0, 90, 1, -30), BackgroundTransparency = 1, Text = "Status: Idle", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
--- ═════════════ TAB BREAK ═════════════
-local tabBreak = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
+-- ═════════════ TAB BERANDA ═════════════
+local tabHome = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
 
+local profileImg = new("ImageLabel", { Parent = tabHome, Size = UDim2.fromOffset(80, 80), Position = UDim2.fromOffset(10, 10), BackgroundColor3 = MainBg, ZIndex = 13 })
+applyCleanStyle(profileImg, 8)
+pcall(function()
+    profileImg.Image = Players:GetUserThumbnailAsync(LP.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+end)
+
+new("TextLabel", { Parent = tabHome, Size = UDim2.new(1, -110, 0, 25), Position = UDim2.fromOffset(100, 15), BackgroundTransparency = 1, Text = "Username: " .. LP.Name, TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
+
+local pingLabel = new("TextLabel", { Parent = tabHome, Size = UDim2.new(1, -110, 0, 20), Position = UDim2.fromOffset(100, 40), BackgroundTransparency = 1, Text = "Ping: 0 ms", TextColor3 = GreyText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
+task.spawn(function()
+    while Running do
+        pcall(function()
+            pingLabel.Text = "Ping: " .. math.floor(LP:GetNetworkPing() * 1000) .. " ms"
+        end)
+        task.wait(1)
+    end
+end)
+
+local btnReload = new("TextButton", { Parent = tabHome, Size = UDim2.new(1, -20, 0, 35), Position = UDim2.fromOffset(10, 100), BackgroundColor3 = Color3.fromRGB(80, 40, 40), Text = "Reload Script (Check Updates)", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 13 })
+applyCleanStyle(btnReload, 6)
+
+btnReload.MouseButton1Click:Connect(function()
+    if ScriptURL ~= "https://raw.githubusercontent.com/..." then
+        gui:Destroy()
+        pcall(function() loadstring(game:HttpGet(ScriptURL))() end)
+    else
+        btnReload.Text = "URL Belum Diisi!"
+        task.wait(2)
+        btnReload.Text = "Reload Script (Check Updates)"
+    end
+end)
+
+-- ═════════════ TAB BREAK ═════════════
+local tabBreak = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
 new("TextLabel", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 25), Position = UDim2.fromOffset(5, 5), BackgroundTransparency = 1, Text = "1. Pilih Zone", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
 local zoneScroll = new("ScrollingFrame", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 100), Position = UDim2.fromOffset(5, 30), BackgroundColor3 = MainBg, BorderSizePixel = 0, ScrollBarThickness = 2, ZIndex = 12 })
@@ -342,18 +358,22 @@ local tabSteal = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), 
 new("TextLabel", { Parent = tabSteal, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "Fitur Steal menyusul.", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13 })
 
 local function switchTab(tab)
+    tabHome.Visible = tab == "home"
     tabBreak.Visible = tab == "break"
     tabSteal.Visible = tab == "steal"
+    
+    btnHome.TextColor3 = tab == "home" and WhiteText or GreyText
     btnBreak.TextColor3 = tab == "break" and WhiteText or GreyText
     btnSteal.TextColor3 = tab == "steal" and WhiteText or GreyText
 end
+btnHome.MouseButton1Click:Connect(function() switchTab("home") end)
 btnBreak.MouseButton1Click:Connect(function() switchTab("break") end)
 btnSteal.MouseButton1Click:Connect(function() switchTab("steal") end)
 
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 200 })
 applyCleanStyle(confirm, 8)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.3?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.5?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.fromOffset(14, 80), BackgroundColor3 = Color3.fromRGB(100, 30, 30), Text = "Ya", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 applyCleanStyle(yesBtn, 6)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.new(1, -114, 0, 80), BackgroundColor3 = DarkPanel, Text = "Batal", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
@@ -363,4 +383,4 @@ noBtn.MouseButton1Click:Connect(function() confirm.Visible = false end)
 yesBtn.MouseButton1Click:Connect(function() Running = false; gui:Destroy() end)
 closeBtn.MouseButton1Click:Connect(function() confirm.Visible = true end)
 
-switchTab("break")
+switchTab("home") -- Buka Beranda pas start
