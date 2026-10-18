@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v4.7 | Pure Text AxD & Lightning Break
+--  AxD Hub v5.0 | Ultimate Break, Pet List, & Home Menu
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -12,17 +12,48 @@ local PG = LP:WaitForChild("PlayerGui")
 
 if PG:FindFirstChild("AxDHubV1") then PG.AxDHubV1:Destroy() end
 
-local ZoneData = {
-    ["Forest"] = {"Rock Egg", "Forest Egg"},
-    ["Desert"] = {"Cactus Egg", "Bones Egg"},
-    ["Snowy"] = {"Frosty Egg", "Frozen Egg"},
-    ["Candy"] = {"Candy Egg", "Rainbow Egg", "Easter Bunny Egg"},
-    ["Swamp"] = {"Sticky Egg", "Tree Egg", "Lake Egg"},
-    ["Abyss Ocean"] = {"Water Egg", "Ocean Egg", "Sea Rock Egg"},
-    ["Volcano"] = {"Volcanic Egg", "Angel Egg", "Fallen Angel Egg"},
-    ["Cherry Blossom"] = {"Blossom Egg", "Petal Egg", "Sakura Egg"},
-    ["Galaxy"] = {"Cosmic Egg", "Nebula Egg", "Black Hole Egg"},
-    ["Planet X"] = {"Plasma Egg", "Supernova Egg", "Celestial Egg"}
+-- ═════════════ DATA LENGKAP DARI LU ═════════════
+local EggDatabase = {
+    ["Planet X"] = {
+        eggs = {"Plasma Egg", "Nebula Egg", "Supernova Egg"},
+        pets = "Bug, Crystal Lizard, Crystal Beast, Crystal Raptor, Crystal Dragon, Mantis, Alien Jellyfish, Crystal Scorpion, Behemoth, Crystal Wolf, Celestial Beast, Celestial Spirit"
+    },
+    ["Forest Zone"] = {
+        eggs = {"Rock Egg", "Forest Egg"},
+        pets = "Chicken, Dog, Bird, Owl, Raccoon, Bear, Fox, Brr Brr Patapim"
+    },
+    ["Desert Zone"] = {
+        eggs = {"Cactus Egg", "Bones Egg"},
+        pets = "Jerboa, Fennec, Camel, Tob Tobi Tob Tob, Snake, Scorpion, Sand Spider, Royal Sphinx"
+    },
+    ["Snowy Zone"] = {
+        eggs = {"Frozen Egg", "Yeti Egg"},
+        pets = "Penguin, Snowman, Arctic Fox, Seal, Polar Bear, Yeti, Ice Dragon, El Maja"
+    },
+    ["Candy Zone"] = {
+        eggs = {"Candy Egg", "Rainbow Egg", "Easter Bunny Egg"},
+        pets = "Gummy Bear, Lollipop Cat, Cotton Candy Dog, Marshmallow Bunny, Chocolate Dragon, Candy Serpent"
+    },
+    ["Swamp Zone"] = {
+        eggs = {"Gooey Egg", "Tree Egg", "Lake Egg"},
+        pets = "Frog, Duckling, Catfish, Turtle, Swan, Axolotl, Crocodile, Leviathan"
+    },
+    ["Ocean Zone"] = {
+        eggs = {"Sea Stones Egg", "Water Egg", "Sea Egg"},
+        pets = "Starfish, Clownfish, Shark, Dolphin, Orca, Octopus, Demon Crab, Kraken"
+    },
+    ["Volcano Zone"] = {
+        eggs = {"Fallen Angel Egg", "Angel Egg", "Volcanic Egg"},
+        pets = "Fire Imp, Magma Gorilla, Phoenix, Lava Hound, Lava Dragon, Nightflame"
+    },
+    ["Blossom Zone"] = {
+        eggs = {"Blossom Egg", "Bamboo Egg", "Fortune Egg"},
+        pets = "Panda, Crane, Tanuki, Samurai Cat, Kitsune, Jade Dragon, Chimera Guardian"
+    },
+    ["Galaxy Zone"] = {
+        eggs = {"Sun Egg", "Starry Egg", "Blackhole Egg"},
+        pets = "Alien, Astronaut Dog, Star Cat, Meteor Golem, Galaxy Hydra, Cosmic Dragon"
+    }
 }
 
 local SelectedZones = {}
@@ -32,6 +63,7 @@ local Running = true
 local SafeZonePart = nil
 local StatusLabel
 
+-- ═════════════ HELPERS ═════════════
 local function new(cls, props, parent)
     local o = Instance.new(cls)
     for k, v in pairs(props or {}) do pcall(function() o[k] = v end) end
@@ -64,7 +96,7 @@ local function getSafeZone()
     return nil
 end
 
--- LOGIKA BREAK
+-- ═════════════ LOGIKA BREAK (FIX TOTAL) ═════════════
 local function startBreakLoop()
     task.spawn(function()
         while Running do
@@ -73,15 +105,19 @@ local function startBreakLoop()
                 if hrp then
                     if StatusLabel then StatusLabel.Text = "Status: Mencari Egg..." end
                     local targetEgg = nil
+                    local targetName = nil
                     
                     for eggName, active in pairs(SelectedEggs) do
                         if active then
                             for _, obj in ipairs(Workspace:GetDescendants()) do
+                                -- Cari Model atau Part yang namanya mengandung nama telur
                                 if (obj:IsA("Model") or obj:IsA("BasePart")) and string.find(string.lower(obj.Name), string.lower(eggName)) then
                                     local part = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true))
                                     local safe = getSafeZone()
+                                    -- Pastiin bukan di dalem base
                                     if part and (not safe or (part.Position - safe.Position).Magnitude > 80) then
                                         targetEgg = {model = obj, part = part}
+                                        targetName = eggName
                                         break
                                     end
                                 end
@@ -91,14 +127,14 @@ local function startBreakLoop()
                     end
                     
                     if targetEgg then
-                        if StatusLabel then StatusLabel.Text = "Status: Lightning Break!" end
+                        if StatusLabel then StatusLabel.Text = "Status: Breaking " .. targetName end
                         
-                        -- Teleport ke egg
-                        hrp.CFrame = targetEgg.part.CFrame + Vector3.new(0, 3, 0)
+                        -- TELEPORT DEPAN TELUR (Bukan ke atas langit)
+                        hrp.CFrame = targetEgg.part.CFrame * CFrame.new(0, 0, -3)
                         hrp.AssemblyLinearVelocity = Vector3.zero
                         task.wait(0.1)
                         
-                        -- Equip Tool
+                        -- Equip Pickaxe
                         local tool = LP.Character and LP.Character:FindFirstChildWhichIsA("Tool")
                         if not tool and LP.Backpack then
                             local pick = LP.Backpack:FindFirstChild("Pickaxe") or LP.Backpack:FindFirstChildWhichIsA("Tool")
@@ -108,29 +144,37 @@ local function startBreakLoop()
                             end
                         end
                         
-                        -- Mukul Kilat 50x
-                        for i = 1, 50 do
-                            if not targetEgg.model.Parent then break end
+                        -- Hajar Telur
+                        local startTime = tick()
+                        local isBroken = false
+                        while tick() - startTime < 1.5 do
+                            if not targetEgg.model.Parent then isBroken = true; break end
+                            
                             if tool then pcall(function() tool:Activate() end) end
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 0) end)
                             pcall(function() firetouchinterest(hrp, targetEgg.part, 1) end)
-                            task.wait(0.01)
+                            task.wait(0.02)
                         end
                         
-                        -- Ambil
-                        for _, d in ipairs(targetEgg.model:GetDescendants()) do
-                            if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
-                            if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
+                        if isBroken or not targetEgg.model.Parent then
+                            if StatusLabel then StatusLabel.Text = "Status: Sukses! Balik ke Safe Zone" end
+                            -- Kumpulin Drop (kalau ada prompt)
+                            for _, d in ipairs(targetEgg.model:GetDescendants()) do
+                                if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
+                                if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
+                            end
+                            
+                            -- Balik ke Safe Zone
+                            local safe = getSafeZone()
+                            if safe then 
+                                hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) 
+                                hrp.AssemblyLinearVelocity = Vector3.zero
+                            end
+                            task.wait(0.5)
+                        else
+                            if StatusLabel then StatusLabel.Text = "Status: Gagal pecah, lanjut egg lain..." end
+                            task.wait(0.5)
                         end
-                        
-                        -- Balik ke Safe Zone
-                        if StatusLabel then StatusLabel.Text = "Status: Kabur ke Safe Zone" end
-                        local safe = getSafeZone()
-                        if safe then 
-                            hrp.CFrame = safe.CFrame + Vector3.new(0, 3, 0) 
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                        end
-                        task.wait(0.3)
                     else
                         task.wait(0.5)
                     end
@@ -145,7 +189,7 @@ local function startBreakLoop()
 end
 startBreakLoop()
 
--- UI CREATION
+-- ═════════════ UI CREATION ═════════════
 local gui = new("ScreenGui", { Name = "AxDHubV1", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999 }, PG)
 
 local MainBg = Color3.fromRGB(15, 15, 15)
@@ -153,19 +197,8 @@ local DarkPanel = Color3.fromRGB(25, 25, 25)
 local WhiteText = Color3.fromRGB(255, 255, 255)
 local GreyText = Color3.fromRGB(150, 150, 150)
 
--- TOMBOL BULAT AXD
-local circle = new("TextButton", { 
-    Parent = gui, 
-    Size = UDim2.fromOffset(50, 50), 
-    Position = UDim2.fromScale(0.5, 0.5), 
-    AnchorPoint = Vector2.new(0.5, 0.5), 
-    BackgroundColor3 = MainBg, 
-    Text = "AxD", 
-    TextColor3 = WhiteText, 
-    Font = Enum.Font.GothamBlack, 
-    TextSize = 18, 
-    ZIndex = 50 
-})
+-- Tombol Bulat
+local circle = new("TextButton", { Parent = gui, Size = UDim2.fromOffset(50, 50), Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = MainBg, Text = "AxD", TextColor3 = WhiteText, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 50 })
 applyStyle(circle, 25)
 
 -- Main Panel
@@ -174,19 +207,17 @@ applyStyle(main, 8)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = DarkPanel, ZIndex = 11 })
 applyStyle(titleBar, 8)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v4.7", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v5.0", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = DarkPanel, Text = "-", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 12 })
 applyStyle(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = DarkPanel, Text = "X", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
 applyStyle(closeBtn, 4)
 
--- Drag Tombol
+-- Drag Logic
 local draggingBtn, dragStartBtn, startPosBtn, movedBtn = false, nil, nil, 0
 circle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingBtn = true; dragStartBtn = input.Position; startPosBtn = circle.Position; movedBtn = 0
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingBtn = true; dragStartBtn = input.Position; startPosBtn = circle.Position; movedBtn = 0 end
 end)
 UserInputService.InputChanged:Connect(function(input)
     if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
@@ -202,12 +233,9 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Drag Panel
 local draggingPanel, dragStartPanel, startPosPanel
 titleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingPanel = true; dragStartPanel = input.Position; startPosPanel = main.Position
-    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingPanel = true; dragStartPanel = input.Position; startPosPanel = main.Position end
 end)
 UserInputService.InputChanged:Connect(function(input)
     if draggingPanel and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
@@ -231,6 +259,7 @@ local function createNavBtn(txt)
     return b
 end
 
+local btnHome = createNavBtn("Beranda")
 local btnBreak = createNavBtn("Break")
 local btnSteal = createNavBtn("Steal")
 
@@ -239,23 +268,44 @@ applyStyle(content, 6)
 
 StatusLabel = new("TextLabel", { Parent = main, Size = UDim2.new(1, -100, 0, 20), Position = UDim2.new(0, 90, 1, -30), BackgroundTransparency = 1, Text = "Status: Idle", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
--- TAB BREAK
-local tabBreak = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
-new("TextLabel", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 25), Position = UDim2.fromOffset(5, 5), BackgroundTransparency = 1, Text = "1. Pilih Zone", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+-- ═════════════ TAB BERANDA ═════════════
+local tabHome = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
 
-local zoneScroll = new("ScrollingFrame", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 100), Position = UDim2.fromOffset(5, 30), BackgroundColor3 = MainBg, BorderSizePixel = 0, ScrollBarThickness = 2, ZIndex = 12 })
+local profileImg = new("ImageLabel", { Parent = tabHome, Size = UDim2.fromOffset(80, 80), Position = UDim2.fromOffset(10, 10), BackgroundColor3 = MainBg, ZIndex = 13 })
+applyStyle(profileImg, 8)
+pcall(function() profileImg.Image = Players:GetUserThumbnailAsync(LP.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) end)
+
+new("TextLabel", { Parent = tabHome, Size = UDim2.new(1, -110, 0, 25), Position = UDim2.fromOffset(100, 15), BackgroundTransparency = 1, Text = "Username: " .. LP.Name, TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
+
+local pingLabel = new("TextLabel", { Parent = tabHome, Size = UDim2.new(1, -110, 0, 20), Position = UDim2.fromOffset(100, 40), BackgroundTransparency = 1, Text = "Ping: 0 ms", TextColor3 = GreyText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 13 })
+task.spawn(function() while Running do pcall(function() pingLabel.Text = "Ping: " .. math.floor(LP:GetNetworkPing() * 1000) .. " ms" end); task.wait(1) end end)
+
+local btnReload = new("TextButton", { Parent = tabHome, Size = UDim2.new(1, -20, 0, 35), Position = UDim2.fromOffset(10, 100), BackgroundColor3 = Color3.fromRGB(80, 40, 40), Text = "Reload Script", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 13 })
+applyStyle(btnReload, 6)
+btnReload.MouseButton1Click:Connect(function()
+    btnReload.Text = "Reloading..."
+    task.wait(1)
+    btnReload.Text = "Reload Script"
+end)
+
+-- ═════════════ TAB BREAK ═════════════
+local tabBreak = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
+new("TextLabel", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 20), Position = UDim2.fromOffset(5, 5), BackgroundTransparency = 1, Text = "1. Pilih Zone", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+
+local zoneScroll = new("ScrollingFrame", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 80), Position = UDim2.fromOffset(5, 25), BackgroundColor3 = MainBg, BorderSizePixel = 0, ScrollBarThickness = 2, ZIndex = 12 })
 applyStyle(zoneScroll, 4)
 local zoneLayout = new("UIListLayout", { Parent = zoneScroll, Padding = UDim.new(0, 3), HorizontalAlignment = Enum.HorizontalAlignment.Center })
 
-new("TextLabel", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 25), Position = UDim2.fromOffset(5, 135), BackgroundTransparency = 1, Text = "2. Pilih Egg", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+new("TextLabel", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 20), Position = UDim2.fromOffset(5, 110), BackgroundTransparency = 1, Text = "2. Pilih Egg & Lihat Pet", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
-local eggScroll = new("ScrollingFrame", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 100), Position = UDim2.fromOffset(5, 160), BackgroundColor3 = MainBg, BorderSizePixel = 0, ScrollBarThickness = 2, ZIndex = 12 })
+local eggScroll = new("ScrollingFrame", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 120), Position = UDim2.fromOffset(5, 130), BackgroundColor3 = MainBg, BorderSizePixel = 0, ScrollBarThickness = 2, ZIndex = 12 })
 applyStyle(eggScroll, 4)
-local eggLayout = new("UIListLayout", { Parent = eggScroll, Padding = UDim.new(0, 3), HorizontalAlignment = Enum.HorizontalAlignment.Center })
+local eggLayout = new("UIListLayout", { Parent = eggScroll, Padding = UDim.new(0, 4), HorizontalAlignment = Enum.HorizontalAlignment.Center })
 
 local btnStart = new("TextButton", { Parent = tabBreak, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.new(0, 5, 1, -35), BackgroundColor3 = Color3.fromRGB(30, 80, 40), Text = "Start Break", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12, Visible = false })
 applyStyle(btnStart, 6)
 
+-- Render Eggs & Pets
 local function renderEggs()
     for _, c in ipairs(eggScroll:GetChildren()) do
         if c:IsA("Frame") or c:IsA("TextButton") then c:Destroy() end
@@ -263,32 +313,47 @@ local function renderEggs()
     local count = 0
     for zName, isZSelected in pairs(SelectedZones) do
         if isZSelected then
-            for _, eName in ipairs(ZoneData[zName]) do
-                count = count + 1
-                local isSelected = SelectedEggs[eName] == true
-                local row = new("Frame", { Parent = eggScroll, Size = UDim2.new(1, -5, 0, 30), BackgroundColor3 = DarkPanel, LayoutOrder = count, ZIndex = 13 })
-                applyStyle(row, 4)
-                new("TextLabel", { Parent = row, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = eName, TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14 })
-                local cb = new("TextButton", { Parent = row, Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -25, 0.5, -10), BackgroundColor3 = isSelected and WhiteText or MainBg, Text = "", ZIndex = 14 })
-                applyStyle(cb, 4)
-                cb.MouseButton1Click:Connect(function()
-                    local isNow = not (SelectedEggs[eName] == true)
-                    SelectedEggs[eName] = isNow
-                    cb.BackgroundColor3 = isNow and WhiteText or MainBg
-                    btnStart.Visible = next(SelectedEggs) ~= nil
-                end)
+            local zoneData = EggDatabase[zName]
+            if zoneData then
+                for _, eName in ipairs(zoneData.eggs) do
+                    count = count + 1
+                    local isSelected = SelectedEggs[eName] == true
+                    
+                    -- Frame lebih tinggi buat nampilin list pet
+                    local row = new("Frame", { Parent = eggScroll, Size = UDim2.new(1, -5, 0, 45), BackgroundColor3 = DarkPanel, LayoutOrder = count, ZIndex = 13 })
+                    applyStyle(row, 4)
+                    
+                    -- Nama Telur
+                    new("TextLabel", { Parent = row, Size = UDim2.new(1, -40, 0, 20), Position = UDim2.fromOffset(10, 2), BackgroundTransparency = 1, Text = eName, TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14 })
+                    
+                    -- Info Pet di dalam telur
+                    new("TextLabel", { Parent = row, Size = UDim2.new(1, -40, 0, 20), Position = UDim2.fromOffset(10, 22), BackgroundTransparency = 1, Text = "Pet: " .. zoneData.pets, TextColor3 = GreyText, Font = Enum.Font.Gotham, TextSize = 9, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 14 })
+                    
+                    -- Checkbox
+                    local cb = new("TextButton", { Parent = row, Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -25, 0.5, -10), BackgroundColor3 = isSelected and WhiteText or MainBg, Text = "", ZIndex = 14 })
+                    applyStyle(cb, 4)
+                    
+                    cb.MouseButton1Click:Connect(function()
+                        local isNow = not (SelectedEggs[eName] == true)
+                        SelectedEggs[eName] = isNow
+                        cb.BackgroundColor3 = isNow and WhiteText or MainBg
+                        btnStart.Visible = next(SelectedEggs) ~= nil
+                    end)
+                end
             end
         end
     end
     eggScroll.CanvasSize = UDim2.new(0, 0, 0, eggLayout.AbsoluteContentSize.Y + 5)
 end
 
-for zName, _ in pairs(ZoneData) do
+for zName, _ in pairs(EggDatabase) do
     local row = new("Frame", { Parent = zoneScroll, Size = UDim2.new(1, -5, 0, 25), BackgroundColor3 = DarkPanel, ZIndex = 13 })
     applyStyle(row, 4)
     new("TextLabel", { Parent = row, Size = UDim2.new(1, -40, 1, 0), Position = UDim2.fromOffset(10, 0), BackgroundTransparency = 1, Text = zName, TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 14 })
+    
     local cb = new("TextButton", { Parent = row, Size = UDim2.fromOffset(20, 20), Position = UDim2.new(1, -25, 0.5, -10), BackgroundColor3 = MainBg, Text = "", ZIndex = 14 })
     applyStyle(cb, 4)
+    
     cb.MouseButton1Click:Connect(function()
         local isNow = not (SelectedZones[zName] == true)
         SelectedZones[zName] = isNow
@@ -308,23 +373,26 @@ btnStart.MouseButton1Click:Connect(function()
     end
 end)
 
--- TAB STEAL
+-- ═════════════ TAB STEAL ═════════════
 local tabSteal = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
 new("TextLabel", { Parent = tabSteal, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "Fitur Steal menyusul.", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13 })
 
 local function switchTab(tab)
+    tabHome.Visible = tab == "home"
     tabBreak.Visible = tab == "break"
     tabSteal.Visible = tab == "steal"
+    btnHome.TextColor3 = tab == "home" and WhiteText or GreyText
     btnBreak.TextColor3 = tab == "break" and WhiteText or GreyText
     btnSteal.TextColor3 = tab == "steal" and WhiteText or GreyText
 end
+btnHome.MouseButton1Click:Connect(function() switchTab("home") end)
 btnBreak.MouseButton1Click:Connect(function() switchTab("break") end)
 btnSteal.MouseButton1Click:Connect(function() switchTab("steal") end)
 
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 130), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = MainBg, Visible = false, ZIndex = 200 })
 applyStyle(confirm, 8)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v4.7?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v5.0?", TextColor3 = WhiteText, Font = Enum.Font.Gotham, TextSize = 13, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.fromOffset(14, 80), BackgroundColor3 = Color3.fromRGB(100, 30, 30), Text = "Ya", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 applyStyle(yesBtn, 6)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(100, 30), Position = UDim2.new(1, -114, 0, 80), BackgroundColor3 = DarkPanel, Text = "Batal", TextColor3 = WhiteText, Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
@@ -334,4 +402,4 @@ noBtn.MouseButton1Click:Connect(function() confirm.Visible = false end)
 yesBtn.MouseButton1Click:Connect(function() Running = false; gui:Destroy() end)
 closeBtn.MouseButton1Click:Connect(function() confirm.Visible = true end)
 
-switchTab("break")
+switchTab("home")
