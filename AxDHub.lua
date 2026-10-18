@@ -1,5 +1,5 @@
 --══════════════════════════════════════════════════════════════
---  AxD Hub v2.4 | Smart Grab (ClickDetector Support & Status UI)
+--  AxD Hub v2.5 | Smart Grab + Server Hop + Rejoin
 --══════════════════════════════════════════════════════════════
 
 local Players = game:GetService("Players")
@@ -8,6 +8,8 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
 
 local LP = Players.LocalPlayer
 local PG = LP:WaitForChild("PlayerGui")
@@ -23,8 +25,8 @@ if parentGui:FindFirstChild("AxDHubV1") then parentGui.AxDHubV1:Destroy() end
 -- ⚡ TURUNIN GRAFIK
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "AxD Hub v2.4",
-        Text = "Grafik dioptimalkan. Auto Steal Smart Mode Aktif.",
+        Title = "AxD Hub v2.5",
+        Text = "Grafik dioptimalkan. Server Hop siap digunakan.",
         Duration = 5
     })
     Lighting.GlobalShadows = false
@@ -152,16 +154,13 @@ local function getSafeZone()
     return nil
 end
 
--- SMART EGG FINDER (Pake match, bukan exact name)
 local function findWildEgg(name)
     local safe = getSafeZone()
     for _, o in ipairs(Workspace:GetDescendants()) do
         if (o:IsA("Model") or o:IsA("BasePart")) and string.find(string.lower(o.Name), string.lower(name)) then
             local p = o.PrimaryPart or o:FindFirstChildWhichIsA("BasePart", true) or (o:IsA("BasePart") and o)
             if p then
-                -- Jarak aman dari base cuma 40 studs (biar egg yg agak jauhan tetep keambil)
                 if safe and (p.Position - safe.Position).Magnitude < 40 then
-                    -- Skip base
                 else
                     return { model = o, part = p }
                 end
@@ -172,7 +171,7 @@ local function findWildEgg(name)
 end
 
 --═════════════ STEAL LOGIC ═════════════
-local StatusLabel -- Dideklarasi dulu buat update status
+local StatusLabel
 
 local function startStealLoop()
     task.spawn(function()
@@ -193,20 +192,17 @@ local function startStealLoop()
                     if target then
                         if StatusLabel then StatusLabel.Text = "Status: Nyamber Egg!" end
                         
-                        -- Teleport + Reset Velocity
                         hrp.CFrame = target.part.CFrame + Vector3.new(0, 3, 0)
                         hrp.AssemblyLinearVelocity = Vector3.zero
                         hrp.AssemblyAngularVelocity = Vector3.zero
                         
                         task.wait(0.05)
                         
-                        -- Ambil Prompt & ClickDetector
                         for _, d in ipairs(target.model:GetDescendants()) do
                             if d:IsA("ProximityPrompt") then pcall(function() fireproximityprompt(d) end) end
                             if d:IsA("ClickDetector") then pcall(function() fireclickdetector(d) end) end
                         end
                         
-                        -- Touch Interest
                         for _, p in ipairs(target.model:GetDescendants()) do
                             if p:IsA("BasePart") then
                                 pcall(function() firetouchinterest(hrp, p, 0) end)
@@ -225,7 +221,7 @@ local function startStealLoop()
                         
                         task.wait(0.1)
                     else
-                        task.wait(0.4) -- Tunggu 0.4 detik biar ga ngeleg
+                        task.wait(0.4)
                     end
                 end
             else
@@ -254,6 +250,34 @@ task.spawn(function()
         task.wait(1)
     end
 end)
+
+--═════════════ SERVER HOP LOGIC ═════════════
+local function HopServer(targetPlayers)
+    if StatusLabel then StatusLabel.Text = "Status: Mencari Server..." end
+    local placeId = game.PlaceId
+    
+    local success, response = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    
+    if success and response and response.data then
+        for _, server in pairs(response.data) do
+            if server.playing < server.maxPlayers then
+                if targetPlayers == 0 or server.playing == targetPlayers then
+                    if StatusLabel then StatusLabel.Text = "Status: Ketemu! Pindah..." end
+                    task.wait(1)
+                    pcall(function()
+                        TeleportService:TeleportToPlaceInstance(placeId, server.id, LP)
+                    end)
+                    return
+                end
+            end
+        end
+        if StatusLabel then StatusLabel.Text = "Status: Server tidak ditemukan." end
+    else
+        if StatusLabel then StatusLabel.Text = "Status: Gagal ambil data." end
+    end
+end
 
 --═════════════ UI CREATION ═════════════
 local gui = new("ScreenGui", { Name = "AxDHubV1", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 999 }, parentGui)
@@ -301,13 +325,14 @@ corner(main, 6); stroke(main, Color3.fromRGB(0,0,0), 2)
 
 local titleBar = new("Frame", { Parent = main, Size = UDim2.new(1, 0, 0, 35), BackgroundColor3 = RedTheme, ZIndex = 11 })
 corner(titleBar, 6)
-new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v2.4", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 12 })
+new("TextLabel", { Parent = titleBar, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "AxD Hub v2.5", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 18, ZIndex = 12 })
 local minBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -70, 0, 2), BackgroundColor3 = Color3.fromRGB(50, 50, 50), Text = "-", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 16, ZIndex = 12 })
 corner(minBtn, 4)
 local closeBtn = new("TextButton", { Parent = titleBar, Size = UDim2.fromOffset(30, 30), Position = UDim2.new(1, -35, 0, 2), BackgroundColor3 = Color3.fromRGB(0,0,0), Text = "X", TextColor3 = TextColor, Font = Enum.Font.GothamBlack, TextSize = 14, ZIndex = 12 })
 corner(closeBtn, 4)
 drag(main, titleBar)
 
+-- SIDE NAV
 local navL = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 305), Position = UDim2.fromOffset(0, 35), BackgroundTransparency = 1, ZIndex = 11 })
 new("UIListLayout", { Parent = navL, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
 local function createNavBtn(txt, parent)
@@ -316,6 +341,7 @@ local function createNavBtn(txt, parent)
 end
 local btnStealTab = createNavBtn("Steal", navL)
 local btnGuardTab = createNavBtn("Guard", navL)
+local btnServerTab = createNavBtn("Server", navL) -- MENU BARU
 
 local navR = new("Frame", { Parent = main, Size = UDim2.fromOffset(100, 305), Position = UDim2.new(1, -100, 0, 35), BackgroundTransparency = 1, ZIndex = 11 })
 new("UIListLayout", { Parent = navR, Padding = UDim.new(0, 5), HorizontalAlignment = Enum.HorizontalAlignment.Center, VerticalAlignment = Enum.VerticalAlignment.Center })
@@ -325,10 +351,9 @@ local btnConfig = createNavBtn("Config", navR)
 local content = new("Frame", { Parent = main, Size = UDim2.new(1, -200, 1, -60), Position = UDim2.fromOffset(100, 35), BackgroundColor3 = PanelBG, ZIndex = 11 })
 corner(content, 4)
 
--- Status Text (Biar lu tau script lagi ngapain)
 StatusLabel = new("TextLabel", { Parent = main, Size = UDim2.new(1, -200, 0, 20), Position = UDim2.new(0, 100, 1, -25), BackgroundTransparency = 1, Text = "Status: Idle", TextColor3 = Color3.fromRGB(200, 200, 200), Font = Enum.Font.GothamBold, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
 
--- TAB STEAL
+--═════════════ TAB STEAL ═════════════
 local tabSteal = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12 })
 
 local headerSteal = new("Frame", { Parent = tabSteal, Size = UDim2.new(1, -10, 0, 40), Position = UDim2.fromOffset(5, 5), BackgroundColor3 = Color3.fromRGB(40,40,40), ZIndex = 12 })
@@ -454,24 +479,62 @@ btnBack.MouseButton1Click:Connect(function()
     eggPopup.Visible = false
 end)
 
--- TAB GUARD
+--═════════════ TAB GUARD ═════════════
 local tabGuard = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
 new("TextLabel", { Parent = tabGuard, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Text = "Godmode Otomatis Aktif!\n(Anti Hit otomatis nyala pas nyolong)", TextColor3 = Color3.fromRGB(200, 200, 200), Font = Enum.Font.GothamBold, TextSize = 14, TextWrapped = true })
 
+--═════════════ TAB SERVER (BARU) ═════════════
+local tabServer = new("Frame", { Parent = content, Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 12, Visible = false })
+
+local serverTitle = new("TextLabel", { Parent = tabServer, Size = UDim2.new(1, -10, 0, 30), Position = UDim2.fromOffset(5, 10), BackgroundTransparency = 1, Text = "Server Hop", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 16, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+
+local serverDesc = new("TextLabel", { Parent = tabServer, Size = UDim2.new(1, -10, 0, 20), Position = UDim2.fromOffset(5, 40), BackgroundTransparency = 1, Text = "Cari jumlah player (0-7):", TextColor3 = Color3.fromRGB(200, 200, 200), Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 12 })
+
+local playerInput = new("TextBox", { Parent = tabServer, Size = UDim2.fromOffset(60, 30), Position = UDim2.fromOffset(5, 65), BackgroundColor3 = Color3.fromRGB(20, 20, 20), Text = "0", PlaceholderText = "0-7", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
+corner(playerInput, 4); stroke(playerInput, RedTheme, 1.5)
+
+local btnHop = new("TextButton", { Parent = tabServer, Size = UDim2.new(1, -80, 0, 30), Position = UDim2.fromOffset(75, 65), BackgroundColor3 = RedTheme, Text = "Teleport ke Server", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
+corner(btnHop, 4); stroke(btnHop, Color3.fromRGB(0,0,0), 1.5)
+
+local btnRejoin = new("TextButton", { Parent = tabServer, Size = UDim2.new(1, -10, 0, 35), Position = UDim2.fromOffset(5, 115), BackgroundColor3 = Color3.fromRGB(50, 50, 50), Text = "Rejoin Server (Balik ke sini)", TextColor3 = TextColor, Font = Enum.Font.GothamBold, TextSize = 14, ZIndex = 12 })
+corner(btnRejoin, 4); stroke(btnRejoin, Color3.fromRGB(100, 100, 100), 1.5)
+
+-- Logika Hop Server
+btnHop.MouseButton1Click:Connect(function()
+    local target = tonumber(playerInput.Text)
+    if target and target >= 0 and target <= 7 then
+        HopServer(target)
+    else
+        if StatusLabel then StatusLabel.Text = "Status: Input harus angka 0-7!" end
+    end
+end)
+
+-- Logika Rejoin
+btnRejoin.MouseButton1Click:Connect(function()
+    if StatusLabel then StatusLabel.Text = "Status: Rejoining..." end
+    task.wait(1)
+    pcall(function()
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LP)
+    end)
+end)
+
+--═════════════ TAB SWITCH LOGIC ═════════════
 local function showTab(tab)
     tabSteal.Visible = tab == "steal"
     tabGuard.Visible = tab == "guard"
+    tabServer.Visible = tab == "server"
     if tab == "steal" then eggPopup.Visible = false end
 end
 btnStealTab.MouseButton1Click:Connect(function() showTab("steal") end)
 btnGuardTab.MouseButton1Click:Connect(function() showTab("guard") end)
+btnServerTab.MouseButton1Click:Connect(function() showTab("server") end)
 
 minBtn.MouseButton1Click:Connect(function() main.Visible = false; circle.Visible = true end)
 
 -- Konfirmasi Hapus
 local confirm = new("Frame", { Parent = gui, Size = UDim2.fromOffset(260, 150), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(15, 12, 20), Visible = false, ZIndex = 200 })
 corner(confirm, 12); stroke(confirm, Color3.fromRGB(180, 50, 70), 1.5)
-new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v2.4?", TextColor3 = Color3.fromRGB(255, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextWrapped = true, ZIndex = 201 })
+new("TextLabel", { Parent = confirm, Size = UDim2.new(1, -20, 0, 50), Position = UDim2.fromOffset(10, 14), BackgroundTransparency = 1, Text = "Hapus AxD Hub v2.5?", TextColor3 = Color3.fromRGB(255, 220, 220), Font = Enum.Font.Gotham, TextSize = 12, TextWrapped = true, ZIndex = 201 })
 local yesBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.fromOffset(14, 100), BackgroundColor3 = Color3.fromRGB(120, 30, 45), Text = "Ya, Hapus", TextColor3 = Color3.fromRGB(255, 240, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
 corner(yesBtn, 8)
 local noBtn = new("TextButton", { Parent = confirm, Size = UDim2.fromOffset(110, 34), Position = UDim2.new(1, -124, 0, 100), BackgroundColor3 = Color3.fromRGB(35, 35, 50), Text = "Batal", TextColor3 = Color3.fromRGB(220, 220, 240), Font = Enum.Font.GothamBold, TextSize = 13, ZIndex = 201 })
